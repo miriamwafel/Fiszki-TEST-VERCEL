@@ -9,6 +9,23 @@ interface LiveAudioRecorderProps {
   disabled?: boolean
 }
 
+// Funkcja do resamplingu audio z dowolnego sample rate do 16kHz
+function resampleTo16kHz(inputBuffer: Float32Array, inputSampleRate: number): Int16Array {
+  const targetSampleRate = 16000
+  const ratio = inputSampleRate / targetSampleRate
+  const outputLength = Math.floor(inputBuffer.length / ratio)
+  const output = new Int16Array(outputLength)
+
+  for (let i = 0; i < outputLength; i++) {
+    const srcIndex = Math.floor(i * ratio)
+    // Clamp do zakresu [-1, 1] i skaluj do Int16
+    const sample = Math.max(-1, Math.min(1, inputBuffer[srcIndex]))
+    output[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+  }
+
+  return output
+}
+
 export function LiveAudioRecorder({
   onAudioData,
   isRecording,
@@ -17,57 +34,65 @@ export function LiveAudioRecorder({
 }: LiveAudioRecorderProps) {
   const [isSupported, setIsSupported] = useState(true)
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const processorRef = useRef<ScriptProcessorNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
 
-  // Sprawdź wsparcie
+  // Sprawdź wsparcie i czy to mobile
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!navigator.mediaDevices?.getUserMedia) {
       setIsSupported(false)
     }
+    // Wykryj mobile
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
   }, [])
 
   const startRecording = useCallback(async () => {
     try {
-      // Pobierz dostęp do mikrofonu
+      // Pobierz dostęp do mikrofonu - NIE wymuszaj sample rate (mobile tego nie obsługuje)
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         },
       })
 
       streamRef.current = stream
 
-      // Utwórz AudioContext
-      const audioContext = new AudioContext({ sampleRate: 16000 })
+      // Utwórz AudioContext z DOMYŚLNYM sample rate (ważne dla iOS!)
+      // @ts-expect-error - webkitAudioContext dla starszych Safari
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext
+      const audioContext = new AudioContextClass()
       audioContextRef.current = audioContext
+
+      // Na iOS trzeba resumować AudioContext po user interaction
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+
+      const actualSampleRate = audioContext.sampleRate
+      console.log('Audio context sample rate:', actualSampleRate)
 
       // Utwórz source z mikrofonu
       const source = audioContext.createMediaStreamSource(stream)
       sourceRef.current = source
 
-      // Użyj ScriptProcessorNode (deprecated ale szeroko wspierany)
-      // W przyszłości można zamienić na AudioWorklet
+      // Użyj ScriptProcessorNode - działa na wszystkich przeglądarkach
       const bufferSize = 4096
       const scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1)
+      processorRef.current = scriptProcessor
 
       scriptProcessor.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0)
 
-        // Konwertuj Float32Array na Int16Array (PCM 16-bit)
-        const pcmData = new Int16Array(inputData.length)
-        for (let i = 0; i < inputData.length; i++) {
-          // Clamp do zakresu [-1, 1] i skaluj do Int16
-          const s = Math.max(-1, Math.min(1, inputData[i]))
-          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-        }
+        // Resampleuj do 16kHz (Gemini wymaga 16kHz PCM)
+        const pcmData = resampleTo16kHz(inputData, actualSampleRate)
 
         onAudioData(pcmData.buffer)
       }
@@ -79,7 +104,7 @@ export function LiveAudioRecorder({
       setPermissionDenied(false)
     } catch (error) {
       console.error('Error starting recording:', error)
-      if ((error as Error).name === 'NotAllowedError') {
+      if ((error as Error).name === 'NotAllowedError' || (error as Error).name === 'PermissionDeniedError') {
         setPermissionDenied(true)
       }
       onRecordingChange(false)
@@ -87,6 +112,16 @@ export function LiveAudioRecorder({
   }, [onAudioData, onRecordingChange])
 
   const stopRecording = useCallback(() => {
+    // Odłącz processor
+    if (processorRef.current && sourceRef.current) {
+      try {
+        sourceRef.current.disconnect()
+        processorRef.current.disconnect()
+      } catch {
+        // Ignore disconnect errors
+      }
+    }
+
     // Zatrzymaj wszystkie tracki
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
@@ -100,7 +135,7 @@ export function LiveAudioRecorder({
     }
 
     sourceRef.current = null
-    workletNodeRef.current = null
+    processorRef.current = null
 
     onRecordingChange(false)
   }, [onRecordingChange])
@@ -125,6 +160,7 @@ export function LiveAudioRecorder({
       <div className="text-center p-4 bg-yellow-50 rounded-lg">
         <p className="text-yellow-700 text-sm">
           Twoja przeglądarka nie obsługuje nagrywania audio.
+          {isMobile && ' Spróbuj otworzyć w Chrome lub Safari.'}
         </p>
       </div>
     )
@@ -134,7 +170,12 @@ export function LiveAudioRecorder({
     return (
       <div className="text-center p-4 bg-red-50 rounded-lg">
         <p className="text-red-700 text-sm">
-          Brak dostępu do mikrofonu. Sprawdź uprawnienia przeglądarki.
+          Brak dostępu do mikrofonu.
+          {isMobile ? (
+            <> Sprawdź ustawienia przeglądarki i systemu.</>
+          ) : (
+            <> Kliknij ikonę kłódki w pasku adresu i zezwól na mikrofon.</>
+          )}
         </p>
         <button
           onClick={startRecording}
@@ -206,6 +247,12 @@ export function LiveAudioRecorder({
           'Kliknij aby rozpocząć rozmowę'
         )}
       </p>
+
+      {isMobile && !isRecording && (
+        <p className="text-xs text-gray-400 text-center">
+          Na telefonie może być potrzebne chwilkę na uruchomienie mikrofonu
+        </p>
+      )}
     </div>
   )
 }

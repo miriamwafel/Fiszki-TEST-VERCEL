@@ -117,41 +117,57 @@ WAŻNE:
 - Bądź naturalny i wspierający`
   }
 
-  // Inicjalizacja Web Speech API dla transkrypcji użytkownika
+  // Inicjalizacja Web Speech API dla transkrypcji użytkownika (opcjonalna - nie działa na iOS)
+  const [speechSupported, setSpeechSupported] = useState(false)
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      console.warn('Speech Recognition not supported')
+      console.warn('Speech Recognition not supported - transkrypcja użytkownika niedostępna')
+      setSpeechSupported(false)
       return
     }
 
-    const recognition = new SpeechRecognition()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = set.language === 'en' ? 'en-US' :
-                       set.language === 'de' ? 'de-DE' :
-                       set.language === 'es' ? 'es-ES' :
-                       set.language === 'fr' ? 'fr-FR' :
-                       set.language === 'pl' ? 'pl-PL' : 'en-US'
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = set.language === 'en' ? 'en-US' :
+                         set.language === 'de' ? 'de-DE' :
+                         set.language === 'es' ? 'es-ES' :
+                         set.language === 'fr' ? 'fr-FR' :
+                         set.language === 'pl' ? 'pl-PL' : 'en-US'
 
-    recognition.onresult = (event) => {
-      let transcript = ''
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript
+      recognition.onresult = (event) => {
+        let transcript = ''
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript
+        }
+        setUserTranscript(transcript)
       }
-      setUserTranscript(transcript)
-    }
 
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error)
-    }
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error)
+        // Nie pokazuj błędu użytkownikowi - to opcjonalna funkcja
+      }
 
-    recognitionRef.current = recognition
+      recognitionRef.current = recognition
+      setSpeechSupported(true)
+    } catch (error) {
+      console.warn('Failed to initialize Speech Recognition:', error)
+      setSpeechSupported(false)
+    }
 
     return () => {
-      recognition.stop()
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch {
+          // Ignore
+        }
+      }
     }
   }, [set.language])
 
@@ -531,7 +547,9 @@ WAŻNE:
               <div className="rounded-2xl rounded-br-md px-4 py-3 bg-primary-400 text-white">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
-                  <span className="text-sm">Słucham...</span>
+                  <span className="text-sm">
+                    {speechSupported ? 'Słucham...' : 'Mówię... (AI słyszy)'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -584,6 +602,11 @@ WAŻNE:
           <br />
           Mów naturalnie - AI odpowiada natychmiast. Możesz przerwać AI w każdej chwili.
         </p>
+        {!speechSupported && (
+          <p className="mt-2 text-xs text-gray-400">
+            Na tym urządzeniu transkrypcja Twojej mowy nie jest widoczna, ale AI Cię słyszy.
+          </p>
+        )}
       </div>
     </div>
   )

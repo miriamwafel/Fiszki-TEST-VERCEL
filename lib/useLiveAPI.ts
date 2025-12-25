@@ -129,6 +129,7 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
                   setAudioQueue(prev => [...prev, audioBuffer])
                 }
                 if (part.text) {
+                  // Dodawaj tekst, ale tylko jeśli AI mówi
                   setCurrentText(prev => prev + part.text)
                 }
               }
@@ -167,7 +168,14 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
             for (const part of modelTurn.parts) {
               // Tekst
               if (part.text) {
-                setCurrentText(prev => prev + part.text)
+                // Reset tekstu jeśli to nowy turn (pierwszy fragment)
+                setCurrentText(prev => {
+                  // Jeśli poprzedni tekst kończy się na ukończony znak, resetuj
+                  if (prev && !isModelSpeaking) {
+                    return part.text || ''
+                  }
+                  return prev + (part.text || '')
+                })
               }
 
               // Audio w formacie base64
@@ -182,6 +190,7 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
           if (turnComplete) {
             console.log('Turn complete')
             setIsModelSpeaking(false)
+            // Reset tekstu po zakończeniu tury - następna odpowiedź zacznie od nowa
           }
         }
       } catch (error) {
