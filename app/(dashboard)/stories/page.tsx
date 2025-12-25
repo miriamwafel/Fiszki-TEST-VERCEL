@@ -411,7 +411,7 @@ export default function StoriesPage() {
     const words = content.split(/(\s+)/)
 
     // If no vocabulary, render normally
-    if (!selectedStory?.vocabulary || selectedStory.vocabulary.length === 0) {
+    if (!selectedStory?.vocabulary || !Array.isArray(selectedStory.vocabulary) || selectedStory.vocabulary.length === 0) {
       return words.map((word, index) => {
         if (/^\s+$/.test(word)) {
           return word
