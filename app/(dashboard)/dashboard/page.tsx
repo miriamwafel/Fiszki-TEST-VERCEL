@@ -95,11 +95,11 @@ export default async function DashboardPage() {
       {/* Przycisk CTA do rozpoczęcia */}
       <div className="mb-8 text-center">
         <Link href="/stories">
-          <button className="inline-flex items-center gap-2 bg-gradient-to-r from-primary-600 to-purple-600 text-white px-8 py-4 rounded-xl hover:from-primary-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-lg">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <button className="inline-flex items-center justify-center gap-2 bg-gradient-to-r from-primary-600 to-purple-600 text-white px-6 py-3 sm:px-8 sm:py-4 rounded-xl hover:from-primary-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl transform hover:scale-105 font-semibold text-base sm:text-lg w-full sm:w-auto">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
-            Rozpocznij od wygenerowania historii
+            <span className="text-center">Rozpocznij od wygenerowania historii</span>
           </button>
         </Link>
       </div>
