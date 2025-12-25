@@ -3,18 +3,35 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export function Navbar() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  // Sprawdź czy użytkownik jest adminem
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch('/api/admin/users')
+        setIsAdmin(res.ok)
+      } catch {
+        setIsAdmin(false)
+      }
+    }
+    if (session?.user) {
+      checkAdmin()
+    }
+  }, [session])
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/sets', label: 'Zestawy' },
     { href: '/stories', label: 'Historyjki' },
     { href: '/exercises', label: 'Ćwiczenia' },
+    ...(isAdmin ? [{ href: '/admin', label: 'Admin', admin: true }] : []),
   ]
 
   return (
@@ -31,9 +48,13 @@ export function Navbar() {
                   key={link.href}
                   href={link.href}
                   className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    pathname.startsWith(link.href)
-                      ? 'text-primary-600 bg-primary-50'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    'admin' in link
+                      ? pathname.startsWith(link.href)
+                        ? 'text-purple-700 bg-purple-100'
+                        : 'text-purple-600 hover:text-purple-700 hover:bg-purple-50'
+                      : pathname.startsWith(link.href)
+                        ? 'text-primary-600 bg-primary-50'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   {link.label}
