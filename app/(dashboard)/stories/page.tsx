@@ -409,20 +409,122 @@ export default function StoriesPage() {
 
   const renderStoryContent = (content: string) => {
     const words = content.split(/(\s+)/)
-    return words.map((word, index) => {
-      if (/^\s+$/.test(word)) {
-        return word
-      }
-      return (
-        <span
-          key={index}
-          className="story-word"
-          onClick={() => handleWordClick(word)}
-        >
-          {word}
-        </span>
-      )
+
+    // If no vocabulary, render normally
+    if (!selectedStory?.vocabulary || selectedStory.vocabulary.length === 0) {
+      return words.map((word, index) => {
+        if (/^\s+$/.test(word)) {
+          return word
+        }
+        return (
+          <span
+            key={index}
+            className="story-word"
+            onClick={() => handleWordClick(word)}
+          >
+            {word}
+          </span>
+        )
+      })
+    }
+
+    // Create vocabulary lookup map (normalize for matching)
+    const vocabMap = new Map<string, { word: string; translation: string }>()
+    selectedStory.vocabulary.forEach((item) => {
+      // Normalize: lowercase, remove punctuation
+      const normalized = item.word.toLowerCase().replace(/[.,!?;:"""'']/g, '').trim()
+      vocabMap.set(normalized, item)
     })
+
+    const result: React.ReactNode[] = []
+    let i = 0
+
+    while (i < words.length) {
+      const word = words[i]
+
+      // If it's whitespace, just add it
+      if (/^\s+$/.test(word)) {
+        result.push(word)
+        i++
+        continue
+      }
+
+      // Try to match vocabulary phrases starting from this position
+      // Try longer phrases first (up to 5 words)
+      let matched = false
+      const maxPhraseLength = 5
+
+      for (let phraseLen = maxPhraseLength; phraseLen >= 1; phraseLen--) {
+        // Build potential phrase from current position
+        const phraseWords: string[] = []
+        let validPhrase = true
+
+        for (let j = 0; j < phraseLen; j++) {
+          const wordIndex = i + j * 2 // Skip whitespace between words
+          if (wordIndex >= words.length || /^\s+$/.test(words[wordIndex])) {
+            validPhrase = false
+            break
+          }
+          phraseWords.push(words[wordIndex])
+        }
+
+        if (!validPhrase) continue
+
+        // Normalize the phrase for lookup
+        const phrase = phraseWords.join(' ')
+        const normalizedPhrase = phrase.toLowerCase().replace(/[.,!?;:"""'']/g, '').trim()
+
+        if (vocabMap.has(normalizedPhrase)) {
+          // Found a vocabulary match!
+          const vocabItem = vocabMap.get(normalizedPhrase)!
+
+          // Collect all elements that make up this phrase (words + whitespace)
+          const phraseElements: React.ReactNode[] = []
+          for (let j = 0; j < phraseLen; j++) {
+            if (j > 0) {
+              // Add whitespace before this word
+              const spaceIndex = i + j * 2 - 1
+              if (spaceIndex < words.length) {
+                phraseElements.push(words[spaceIndex])
+              }
+            }
+            phraseElements.push(words[i + j * 2])
+          }
+
+          result.push(
+            <span
+              key={`vocab-${i}`}
+              className="story-word bg-amber-100 hover:bg-amber-200 cursor-pointer px-0.5 rounded transition-colors"
+              onClick={() => setWordModal(vocabItem)}
+              title={`${vocabItem.word} - ${vocabItem.translation}`}
+            >
+              {phraseElements}
+            </span>
+          )
+
+          // Skip past this phrase
+          i += phraseLen * 2 - 1
+          matched = true
+          break
+        }
+      }
+
+      if (!matched) {
+        // No vocabulary match, render as normal clickable word
+        result.push(
+          <span
+            key={`word-${i}`}
+            className="story-word"
+            onClick={() => handleWordClick(word)}
+          >
+            {word}
+          </span>
+        )
+        i++
+      }
+    }
+
+    return result
   }
 
   return (
