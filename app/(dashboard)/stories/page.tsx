@@ -40,15 +40,15 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
-    // Symulowany postęp: szybki start, potem wolniejszy
+    // Symulowany postęp dostosowany do ~45 sekund generowania historii
     const progressInterval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 90) return prev // Zatrzymaj na 90% i czekaj na odpowiedź
-        if (prev < 30) return prev + 3 // Szybki start
-        if (prev < 60) return prev + 2 // Średnie tempo
-        return prev + 1 // Wolne tempo na końcu
+        if (prev < 30) return prev + 1.5 // Szybki start (~6s)
+        if (prev < 60) return prev + 0.75 // Średnie tempo (~12s)
+        return prev + 0.4 // Wolne tempo na końcu (~22s)
       })
-    }, 200)
+    }, 300)
 
     return () => {
       clearInterval(messageInterval)

@@ -61,15 +61,15 @@ function LoadingSpinner({ message }: { message: string }) {
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
-    // Symulowany postęp: szybki start, potem wolniejszy
+    // Symulowany postęp dostosowany do ~15 sekund (1.5s na słówko dla średniego zestawu)
     const progressInterval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 90) return prev // Zatrzymaj na 90% i czekaj na odpowiedź
-        if (prev < 30) return prev + 3 // Szybki start
-        if (prev < 60) return prev + 2 // Średnie tempo
-        return prev + 1 // Wolne tempo na końcu
+        if (prev < 30) return prev + 2.5 // Szybki start (~3s)
+        if (prev < 60) return prev + 1.5 // Średnie tempo (~5s)
+        return prev + 1 // Wolne tempo na końcu (~7.5s)
       })
-    }, 200)
+    }, 250)
 
     return () => {
       clearInterval(dotsInterval)
