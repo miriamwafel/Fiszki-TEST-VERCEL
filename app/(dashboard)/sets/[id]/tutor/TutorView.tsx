@@ -109,7 +109,7 @@ WAŻNE: To jest rozmowa głosowa w czasie rzeczywistym. Odpowiadaj naturalnie i 
     isModelSpeaking,
   } = useLiveAPI({
     apiKey: config?.apiKey || '',
-    model: config?.model || 'models/gemini-2.0-flash-exp',
+    model: config?.model || 'models/gemini-3-flash-preview',
     systemInstruction,
   })
 

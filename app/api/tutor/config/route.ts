@@ -14,7 +14,7 @@ export async function GET() {
     // Zwróć klucz API (w produkcji powinno się używać ephemeral tokens)
     return NextResponse.json({
       apiKey: process.env.GEMINI_API_KEY,
-      model: 'models/gemini-2.0-flash-exp', // Model wspierający Live API
+      model: 'models/gemini-3-flash-preview', // Model wspierający Live API
     })
   } catch (error) {
     console.error('Tutor config error:', error)
