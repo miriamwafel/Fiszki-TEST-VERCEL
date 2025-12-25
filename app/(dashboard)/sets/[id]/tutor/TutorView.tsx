@@ -57,6 +57,7 @@ export function TutorView({ set }: { set: FlashcardSet }) {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastTextRef = useRef('')
+  const hasTriedConnect = useRef(false)
 
   const langName = languageNames[set.language] || set.language
 
@@ -127,9 +128,10 @@ WAŻNE: To jest rozmowa głosowa w czasie rzeczywistym. Odpowiadaj naturalnie i 
     }
   }, [currentText, isModelSpeaking])
 
-  // Połącz po załadowaniu konfiguracji
+  // Połącz po załadowaniu konfiguracji (tylko raz)
   useEffect(() => {
-    if (config && connectionState === 'disconnected') {
+    if (config && !hasTriedConnect.current && connectionState === 'disconnected') {
+      hasTriedConnect.current = true
       connect()
     }
   }, [config, connectionState, connect])
@@ -254,6 +256,27 @@ WAŻNE: To jest rozmowa głosowa w czasie rzeczywistym. Odpowiadaj naturalnie i 
       {/* Chat area */}
       <Card className="mb-4">
         <div className="h-[350px] overflow-y-auto p-4 space-y-4">
+          {connectionState === 'error' && (
+            <div className="text-center py-8">
+              <p className="text-red-500 mb-4">
+                Nie udało się połączyć z Gemini Live API.
+                <br />
+                <span className="text-sm text-gray-500">
+                  Upewnij się, że Twój klucz API ma dostęp do Live API.
+                </span>
+              </p>
+              <Button
+                onClick={() => {
+                  hasTriedConnect.current = false
+                  connect()
+                }}
+                variant="secondary"
+              >
+                Spróbuj ponownie
+              </Button>
+            </div>
+          )}
+
           {messages.length === 0 && connectionState === 'connected' && (
             <div className="text-center py-8">
               <p className="text-gray-500 mb-4">
@@ -262,6 +285,13 @@ WAŻNE: To jest rozmowa głosowa w czasie rzeczywistym. Odpowiadaj naturalnie i 
               <Button onClick={handleStartConversation} variant="secondary">
                 Lub kliknij tutaj aby AI zaczęło
               </Button>
+            </div>
+          )}
+
+          {connectionState === 'connecting' && (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3" />
+              <p className="text-gray-500">Łączenie z AI...</p>
             </div>
           )}
 

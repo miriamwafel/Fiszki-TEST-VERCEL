@@ -151,12 +151,15 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
       setConnectionState('error')
     }
 
-    ws.onclose = () => {
-      console.log('WebSocket closed')
-      setConnectionState('disconnected')
+    ws.onclose = (event) => {
+      console.log('WebSocket closed:', event.code, event.reason)
+      // Nie ustawiaj disconnected jeśli był error - żeby nie próbować reconnect
+      if (connectionState !== 'error') {
+        setConnectionState('error') // Ustaw error zamiast disconnected żeby zatrzymać reconnect
+      }
       setupCompleteRef.current = false
     }
-  }, [config, base64ToArrayBuffer])
+  }, [config, base64ToArrayBuffer, connectionState])
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
