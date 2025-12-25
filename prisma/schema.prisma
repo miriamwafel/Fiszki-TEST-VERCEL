@@ -1,0 +1,89 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sets          FlashcardSet[]
+  stories       Story[]
+  practiceStats PracticeStats[]
+}
+
+model FlashcardSet {
+  id          String      @id @default(cuid())
+  name        String
+  description String?
+  language    String      // język, którego się uczymy (np. "en", "de", "es")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  flashcards  Flashcard[]
+
+  @@index([userId])
+}
+
+model Flashcard {
+  id              String   @id @default(cuid())
+  word            String   // słowo w nauczanym języku
+  translation     String   // tłumaczenie na polski
+  context         String?  // dodatkowy kontekst (np. bezokolicznik, przykład użycia)
+  partOfSpeech    String?  // część mowy (verb, noun, adjective, etc.)
+  infinitive      String?  // bezokolicznik (dla czasowników)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  setId           String
+  set             FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  practiceStats   PracticeStats[]
+
+  @@index([setId])
+}
+
+model Story {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  language    String
+  difficulty  String   // A1, A2, B1, B2, C1, C2
+  wordCount   Int
+  createdAt   DateTime @default(now())
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PracticeStats {
+  id           String    @id @default(cuid())
+  correct      Int       @default(0)
+  incorrect    Int       @default(0)
+  lastPractice DateTime  @default(now())
+  mastered     Boolean   @default(false)
+
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  flashcardId  String
+  flashcard    Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, flashcardId])
+  @@index([userId])
+  @@index([flashcardId])
+}
