@@ -1,33 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-
-// Deklaracja typów dla Web Speech API
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number
-  results: SpeechRecognitionResultList
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean
-  interimResults: boolean
-  lang: string
-  start(): void
-  stop(): void
-  onresult: ((event: SpeechRecognitionEvent) => void) | null
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition
-    webkitSpeechRecognition: new () => SpeechRecognition
-  }
-}
 import Link from 'next/link'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
@@ -98,7 +71,7 @@ export function TutorView({ set }: { set: FlashcardSet }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastTextRef = useRef('')
   const hasTriedConnect = useRef(false)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
   const langName = languageNames[set.language] || set.language
 
