@@ -61,7 +61,7 @@ const levelDescriptions: Record<LanguageLevel, string> = {
 export function TutorView({ set }: { set: FlashcardSet }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [inputText, setInputText] = useState('')
-  const [isRecording, setIsRecording] = useState(false)
+  const [isConversationActive, setIsConversationActive] = useState(false)
   const [config, setConfig] = useState<{ apiKey: string; model: string } | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -71,10 +71,11 @@ export function TutorView({ set }: { set: FlashcardSet }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const hasTriedConnect = useRef(false)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
+  const lastFinalTranscriptRef = useRef('')
 
   const langName = languageNames[set.language] || set.language
 
-  // Systemowa instrukcja dla AI - zależna od poziomu
+  // Systemowa instrukcja dla AI
   const getSystemInstruction = (selectedLevel: LanguageLevel) => {
     const levelInstructions: Record<LanguageLevel, string> = {
       A1: `Mów GŁÓWNIE po polsku. Wprowadzaj tylko pojedyncze słowa w języku ${langName}.
@@ -113,10 +114,11 @@ Twoja rola:
 WAŻNE:
 - To jest rozmowa głosowa w czasie rzeczywistym
 - Zacznij od przywitania PO POLSKU i zapytaj czego uczeń chce się nauczyć
-- Bądź naturalny i wspierający`
+- Bądź naturalny i wspierający
+- Możesz być przerywany w trakcie mówienia - to normalne w rozmowie`
   }
 
-  // Inicjalizacja Web Speech API dla transkrypcji użytkownika (opcjonalna - nie działa na iOS)
+  // Inicjalizacja Web Speech API dla transkrypcji
   const [speechSupported, setSpeechSupported] = useState(false)
 
   useEffect(() => {
@@ -124,7 +126,7 @@ WAŻNE:
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SpeechRecognition) {
-      console.warn('Speech Recognition not supported - transkrypcja użytkownika niedostępna')
+      console.warn('Speech Recognition not supported')
       setSpeechSupported(false)
       return
     }
@@ -133,23 +135,56 @@ WAŻNE:
       const recognition = new SpeechRecognition()
       recognition.continuous = true
       recognition.interimResults = true
+      // Ustaw język na język zestawu (lepsze rozpoznawanie)
       recognition.lang = set.language === 'en' ? 'en-US' :
                          set.language === 'de' ? 'de-DE' :
                          set.language === 'es' ? 'es-ES' :
                          set.language === 'fr' ? 'fr-FR' :
-                         set.language === 'pl' ? 'pl-PL' : 'en-US'
+                         set.language === 'it' ? 'it-IT' :
+                         set.language === 'pt' ? 'pt-PT' :
+                         'en-US'
 
       recognition.onresult = (event) => {
-        let transcript = ''
+        let interimTranscript = ''
+        let finalTranscript = ''
+
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript
+          const transcript = event.results[i][0].transcript
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript
+          } else {
+            interimTranscript += transcript
+          }
         }
-        setUserTranscript(transcript)
+
+        // Pokazuj bieżącą transkrypcję
+        setUserTranscript(interimTranscript || finalTranscript)
+
+        // Gdy mamy finalny tekst, dodaj jako wiadomość
+        if (finalTranscript && finalTranscript !== lastFinalTranscriptRef.current) {
+          lastFinalTranscriptRef.current = finalTranscript
+          setMessages(prev => [...prev, { role: 'user', content: finalTranscript.trim() }])
+          setUserTranscript('')
+        }
       }
 
       recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error)
-        // Nie pokazuj błędu użytkownikowi - to opcjonalna funkcja
+        // Restart przy niektórych błędach
+        if (event.error === 'no-speech' || event.error === 'audio-capture') {
+          // Ignoruj - to normalne
+        }
+      }
+
+      recognition.onend = () => {
+        // Automatyczny restart jeśli rozmowa aktywna
+        if (isConversationActive && recognitionRef.current) {
+          try {
+            recognitionRef.current.start()
+          } catch {
+            // Już uruchomione
+          }
+        }
       }
 
       recognitionRef.current = recognition
@@ -168,27 +203,28 @@ WAŻNE:
         }
       }
     }
-  }, [set.language])
+  }, [set.language, isConversationActive])
 
-  // Start/stop speech recognition when recording
+  // Start/stop speech recognition gdy rozmowa się zmienia
   useEffect(() => {
     if (!recognitionRef.current) return
 
-    if (isRecording) {
+    if (isConversationActive) {
       try {
+        lastFinalTranscriptRef.current = ''
         recognitionRef.current.start()
       } catch {
         // Already started
       }
     } else {
-      recognitionRef.current.stop()
-      // Zapisz transkrypt jako wiadomość użytkownika
-      if (userTranscript.trim()) {
-        setMessages(prev => [...prev, { role: 'user', content: userTranscript.trim() }])
-        setUserTranscript('')
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        // Already stopped
       }
+      setUserTranscript('')
     }
-  }, [isRecording, userTranscript])
+  }, [isConversationActive])
 
   // Pobierz konfigurację API
   useEffect(() => {
@@ -213,14 +249,13 @@ WAŻNE:
     fetchConfig()
   }, [])
 
-  // Live API hook - używa instrukcji zależnej od poziomu
+  // Live API hook
   const {
     connect,
     disconnect,
     sendAudio,
     sendText,
     connectionState,
-    currentText,
     audioQueue,
     clearAudioQueue,
     isModelSpeaking,
@@ -233,13 +268,9 @@ WAŻNE:
   // Scrolluj do najnowszej wiadomości
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, currentText, userTranscript])
+  }, [messages, userTranscript, isModelSpeaking])
 
-  // W trybie audio tekst z Gemini to "myślenie" AI, nie transkrypcja mowy
-  // Nie dodajemy go do wiadomości - rozmowa jest tylko głosowa
-  // Zostawiamy tylko wiadomości użytkownika (z transkrypcji lub wpisane)
-
-  // Połącz po załadowaniu konfiguracji I wybraniu poziomu (tylko raz)
+  // Połącz po załadowaniu konfiguracji I wybraniu poziomu
   useEffect(() => {
     if (config && level && !hasTriedConnect.current && connectionState === 'disconnected') {
       hasTriedConnect.current = true
@@ -252,7 +283,6 @@ WAŻNE:
   useEffect(() => {
     if (connectionState === 'connected' && level && !hasGreetedRef.current) {
       hasGreetedRef.current = true
-      // Wyślij sygnał do AI żeby się przywitał
       setTimeout(() => {
         sendText(`Cześć! Jestem gotowy do nauki języka ${langName} na poziomie ${level}.`)
       }, 500)
@@ -275,8 +305,8 @@ WAŻNE:
     [connectionState, sendAudio]
   )
 
-  const handleRecordingChange = useCallback((recording: boolean) => {
-    setIsRecording(recording)
+  const handleConversationChange = useCallback((active: boolean) => {
+    setIsConversationActive(active)
   }, [])
 
   const handleAudioPlayed = useCallback(() => {
@@ -287,18 +317,9 @@ WAŻNE:
     e.preventDefault()
     if (!inputText.trim() || connectionState !== 'connected') return
 
-    // Dodaj wiadomość użytkownika
     setMessages(prev => [...prev, { role: 'user', content: inputText.trim() }])
-
-    // Wyślij do Gemini
     sendText(inputText.trim())
     setInputText('')
-  }
-
-  const handleStartConversation = () => {
-    if (connectionState === 'connected') {
-      sendText('Cześć! Rozpocznijmy naukę.')
-    }
   }
 
   if (configLoading) {
@@ -437,15 +458,11 @@ WAŻNE:
 
       {/* Chat area */}
       <Card className="mb-4">
-        <div className="h-[350px] overflow-y-auto p-4 space-y-4">
+        <div className="h-[300px] overflow-y-auto p-4 space-y-4">
           {connectionState === 'error' && (
             <div className="text-center py-8">
               <p className="text-red-500 mb-4">
                 Nie udało się połączyć z Gemini Live API.
-                <br />
-                <span className="text-sm text-gray-500">
-                  Upewnij się, że Twój klucz API ma dostęp do Live API.
-                </span>
               </p>
               <Button
                 onClick={() => {
@@ -459,11 +476,10 @@ WAŻNE:
             </div>
           )}
 
-          {messages.length === 0 && connectionState === 'connected' && !isModelSpeaking && (
+          {messages.length === 0 && connectionState === 'connected' && !isModelSpeaking && !isConversationActive && (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-3" />
               <p className="text-gray-500">
-                AI Tutor zaraz się przywita...
+                Kliknij przycisk poniżej aby rozpocząć rozmowę z AI Tutorem
               </p>
             </div>
           )}
@@ -494,24 +510,15 @@ WAŻNE:
             </div>
           ))}
 
-          {/* Aktualny tekst AI (streaming) - ukryty bo w trybie audio tekst to "myślenie" AI */}
-          {/* Zamiast tego pokazujemy tylko wskaźnik mówienia */}
-
-          {/* Indykator mówienia AI */}
+          {/* Wskaźnik że AI mówi */}
           {isModelSpeaking && (
             <div className="flex justify-start">
               <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <div className="flex gap-1">
                     <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" />
-                    <span
-                      className="w-2 h-2 bg-primary-500 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.1s' }}
-                    />
-                    <span
-                      className="w-2 h-2 bg-primary-500 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.2s' }}
-                    />
+                    <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   </div>
                   <span className="text-sm text-gray-600">Nauczyciel mówi...</span>
                 </div>
@@ -520,25 +527,11 @@ WAŻNE:
           )}
 
           {/* Transkrypcja użytkownika na żywo */}
-          {isRecording && userTranscript && (
+          {isConversationActive && userTranscript && (
             <div className="flex justify-end">
-              <div className="max-w-[80%] rounded-2xl rounded-br-md px-4 py-3 bg-primary-400 text-white">
+              <div className="max-w-[80%] rounded-2xl rounded-br-md px-4 py-3 bg-primary-300 text-white">
                 <p className="opacity-90">{userTranscript}</p>
                 <span className="inline-block w-2 h-4 bg-white/50 animate-pulse ml-1" />
-              </div>
-            </div>
-          )}
-
-          {/* Wskaźnik nagrywania bez transkrypcji */}
-          {isRecording && !userTranscript && (
-            <div className="flex justify-end">
-              <div className="rounded-2xl rounded-br-md px-4 py-3 bg-primary-400 text-white">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-red-400 rounded-full animate-pulse" />
-                  <span className="text-sm">
-                    {speechSupported ? 'Słucham...' : 'Mówię... (AI słyszy)'}
-                  </span>
-                </div>
               </div>
             </div>
           )}
@@ -553,24 +546,24 @@ WAŻNE:
         onAudioPlayed={handleAudioPlayed}
       />
 
-      {/* Voice recorder */}
+      {/* Voice recorder - główny interfejs */}
       <Card className="p-6 mb-4">
         <LiveAudioRecorder
           onAudioData={handleAudioData}
-          isRecording={isRecording}
-          onRecordingChange={handleRecordingChange}
+          isActive={isConversationActive}
+          onActiveChange={handleConversationChange}
           disabled={connectionState !== 'connected'}
         />
       </Card>
 
-      {/* Text input fallback */}
+      {/* Text input - zapasowe wejście */}
       <Card className="p-4">
         <form onSubmit={handleSubmit} className="flex gap-3">
           <div className="flex-1">
             <Input
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder="Lub wpisz wiadomość..."
+              placeholder="Lub wpisz wiadomość tekstową..."
               disabled={connectionState !== 'connected'}
             />
           </div>
@@ -584,15 +577,16 @@ WAŻNE:
       </Card>
 
       {/* Tips */}
-      <div className="mt-4 text-center text-sm text-gray-500">
+      <div className="mt-4 text-center text-sm text-gray-500 space-y-1">
         <p>
-          Rozmowa w czasie rzeczywistym przez Gemini Live API.
-          <br />
-          Mów naturalnie - AI odpowiada natychmiast. Możesz przerwać AI w każdej chwili.
+          <strong>Tryb rozmowy ciągłej</strong> - kliknij raz aby zacząć, kliknij ponownie aby zakończyć.
+        </p>
+        <p>
+          Mów naturalnie, możesz przerywać AI w każdej chwili.
         </p>
         {!speechSupported && (
-          <p className="mt-2 text-xs text-gray-400">
-            Na tym urządzeniu transkrypcja Twojej mowy nie jest widoczna, ale AI Cię słyszy.
+          <p className="text-xs text-gray-400">
+            Transkrypcja mowy niedostępna na tym urządzeniu, ale AI Cię słyszy.
           </p>
         )}
       </div>
