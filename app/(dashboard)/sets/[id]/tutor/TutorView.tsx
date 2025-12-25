@@ -69,7 +69,6 @@ export function TutorView({ set }: { set: FlashcardSet }) {
   const [userTranscript, setUserTranscript] = useState('')
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const lastTextRef = useRef('')
   const hasTriedConnect = useRef(false)
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
 
@@ -236,14 +235,9 @@ WAŻNE:
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, currentText, userTranscript])
 
-  // Aktualizuj wiadomości gdy AI skończy mówić
-  useEffect(() => {
-    if (!isModelSpeaking && currentText && currentText !== lastTextRef.current) {
-      // AI skończyło mówić - dodaj wiadomość
-      setMessages(prev => [...prev, { role: 'tutor', content: currentText }])
-      lastTextRef.current = currentText
-    }
-  }, [currentText, isModelSpeaking])
+  // W trybie audio tekst z Gemini to "myślenie" AI, nie transkrypcja mowy
+  // Nie dodajemy go do wiadomości - rozmowa jest tylko głosowa
+  // Zostawiamy tylko wiadomości użytkownika (z transkrypcji lub wpisane)
 
   // Połącz po załadowaniu konfiguracji I wybraniu poziomu (tylko raz)
   useEffect(() => {
@@ -500,32 +494,26 @@ WAŻNE:
             </div>
           ))}
 
-          {/* Aktualny tekst AI (streaming) */}
-          {isModelSpeaking && currentText && (
-            <div className="flex justify-start">
-              <div className="max-w-[80%] rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 text-gray-900">
-                <p>{currentText}</p>
-                <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-1" />
-              </div>
-            </div>
-          )}
+          {/* Aktualny tekst AI (streaming) - ukryty bo w trybie audio tekst to "myślenie" AI */}
+          {/* Zamiast tego pokazujemy tylko wskaźnik mówienia */}
 
           {/* Indykator mówienia AI */}
-          {isModelSpeaking && !currentText && (
+          {isModelSpeaking && (
             <div className="flex justify-start">
               <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                    <span className="w-2 h-2 bg-primary-500 rounded-full animate-bounce" />
                     <span
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      className="w-2 h-2 bg-primary-500 rounded-full animate-bounce"
                       style={{ animationDelay: '0.1s' }}
                     />
                     <span
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                      className="w-2 h-2 bg-primary-500 rounded-full animate-bounce"
                       style={{ animationDelay: '0.2s' }}
                     />
                   </div>
+                  <span className="text-sm text-gray-600">Nauczyciel mówi...</span>
                 </div>
               </div>
             </div>
