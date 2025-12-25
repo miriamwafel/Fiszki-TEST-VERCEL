@@ -221,6 +221,11 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
       return
     }
 
+    // Loguj tylko co 10 wysłany chunk żeby nie zaśmiecać konsoli
+    if (Math.random() < 0.1) {
+      console.log('Sending audio chunk:', audioData.byteLength, 'bytes')
+    }
+
     const message = {
       realtimeInput: {
         mediaChunks: [{

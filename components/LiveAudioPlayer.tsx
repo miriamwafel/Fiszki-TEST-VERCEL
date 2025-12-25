@@ -16,6 +16,7 @@ export function LiveAudioPlayer({
   const audioContextRef = useRef<AudioContext | null>(null)
   const isPlayingRef = useRef(false)
   const queueRef = useRef<ArrayBuffer[]>([])
+  const processedCountRef = useRef(0) // Śledź ile elementów już przetworzono
   const [isPlaying, setIsPlaying] = useState(false)
 
   // Inicjalizacja AudioContext
@@ -107,13 +108,24 @@ export function LiveAudioPlayer({
     onAudioPlayed()
   }, [playBuffer, onAudioPlayed])
 
-  // Dodaj nowe audio do kolejki
+  // Dodaj nowe audio do kolejki (tylko nowe elementy)
   useEffect(() => {
-    if (audioQueue.length > 0) {
-      queueRef.current.push(...audioQueue)
+    // Dodaj tylko elementy które jeszcze nie były przetworzone
+    const newItems = audioQueue.slice(processedCountRef.current)
+    if (newItems.length > 0) {
+      console.log('Adding', newItems.length, 'new audio items to queue')
+      queueRef.current.push(...newItems)
+      processedCountRef.current = audioQueue.length
       processQueue()
     }
   }, [audioQueue, processQueue])
+
+  // Reset processedCount gdy audioQueue jest wyczyszczone
+  useEffect(() => {
+    if (audioQueue.length === 0) {
+      processedCountRef.current = 0
+    }
+  }, [audioQueue.length])
 
   // Cleanup
   useEffect(() => {
