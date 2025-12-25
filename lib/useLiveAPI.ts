@@ -100,9 +100,20 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
       ws.send(JSON.stringify(setupMessage))
     }
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       try {
+        // Obsłuż dane binarne (audio) - Blob
+        if (event.data instanceof Blob) {
+          const arrayBuffer = await event.data.arrayBuffer()
+          console.log('Received audio blob:', arrayBuffer.byteLength, 'bytes')
+          setIsModelSpeaking(true)
+          setAudioQueue(prev => [...prev, arrayBuffer])
+          return
+        }
+
+        // Obsłuż JSON
         const message: ServerMessage = JSON.parse(event.data)
+        console.log('Received JSON message:', message)
 
         if (message.setupComplete) {
           console.log('Setup complete!')
@@ -121,7 +132,7 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
                 setCurrentText(prev => prev + part.text)
               }
 
-              // Audio
+              // Audio w formacie base64
               if (part.inlineData?.mimeType.startsWith('audio/')) {
                 setIsModelSpeaking(true)
                 const audioBuffer = base64ToArrayBuffer(part.inlineData.data)
@@ -131,11 +142,12 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
           }
 
           if (turnComplete) {
+            console.log('Turn complete')
             setIsModelSpeaking(false)
           }
         }
       } catch (error) {
-        console.error('Error parsing message:', error)
+        console.error('Error parsing message:', error, typeof event.data)
       }
     }
 
