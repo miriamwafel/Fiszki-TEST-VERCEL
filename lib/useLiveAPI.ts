@@ -105,6 +105,26 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
         // Obsłuż dane binarne (audio) - Blob
         if (event.data instanceof Blob) {
           const arrayBuffer = await event.data.arrayBuffer()
+
+          // Jeśli mały blob - może to być tekst/błąd, spróbuj zdekodować
+          if (arrayBuffer.byteLength < 1000) {
+            const text = new TextDecoder().decode(arrayBuffer)
+            console.log('Received small blob as text:', text)
+
+            // Spróbuj sparsować jako JSON
+            try {
+              const jsonData = JSON.parse(text)
+              if (jsonData.setupComplete) {
+                console.log('Setup complete (from blob)!')
+                setupCompleteRef.current = true
+                setConnectionState('connected')
+                return
+              }
+            } catch {
+              // Nie jest JSON - może być audio
+            }
+          }
+
           console.log('Received audio blob:', arrayBuffer.byteLength, 'bytes')
           setIsModelSpeaking(true)
           setAudioQueue(prev => [...prev, arrayBuffer])
