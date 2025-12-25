@@ -28,8 +28,8 @@ export function Navbar() {
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
-    { href: '/sets', label: 'Zestawy' },
     { href: '/stories', label: 'Historyjki' },
+    { href: '/sets', label: 'Zestawy' },
     { href: '/exercises', label: 'Ćwiczenia' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', admin: true }] : []),
   ]
