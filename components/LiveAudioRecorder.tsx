@@ -185,10 +185,36 @@ export function LiveAudioRecorder({
     )
   }
 
+  const handleInteractionStart = useCallback(() => {
+    if (disabled || isInitializing) return
+    if (isMobile) {
+      // Mobile: push-to-talk - zacznij nagrywać
+      if (!isActive) {
+        startRecording()
+      }
+    } else {
+      // Desktop: toggle
+      toggleConversation()
+    }
+  }, [disabled, isInitializing, isMobile, isActive, startRecording, toggleConversation])
+
+  const handleInteractionEnd = useCallback(() => {
+    if (disabled || isInitializing) return
+    if (isMobile && isActive) {
+      // Mobile: push-to-talk - zatrzymaj nagrywanie po puszczeniu
+      stopRecording()
+    }
+  }, [disabled, isInitializing, isMobile, isActive, stopRecording])
+
   return (
     <div className="flex flex-col items-center gap-4">
       <button
-        onClick={toggleConversation}
+        onClick={!isMobile ? handleInteractionStart : undefined}
+        onMouseDown={isMobile ? handleInteractionStart : undefined}
+        onMouseUp={isMobile ? handleInteractionEnd : undefined}
+        onMouseLeave={isMobile ? handleInteractionEnd : undefined}
+        onTouchStart={isMobile ? handleInteractionStart : undefined}
+        onTouchEnd={isMobile ? handleInteractionEnd : undefined}
         disabled={disabled || isInitializing}
         className={`
           relative w-32 h-32 rounded-full transition-all duration-500
@@ -242,16 +268,16 @@ export function LiveAudioRecorder({
           {isInitializing ? (
             'Uruchamianie mikrofonu...'
           ) : isActive ? (
-            'Rozmowa aktywna'
+            isMobile ? 'Mówisz...' : 'Rozmowa aktywna'
           ) : (
-            'Rozpocznij rozmowę'
+            isMobile ? 'Przytrzymaj aby mówić' : 'Rozpocznij rozmowę'
           )}
         </p>
         <p className="text-sm text-gray-500 mt-1">
           {isActive ? (
-            'Kliknij aby zakończyć'
+            isMobile ? 'Puść aby AI odpowiedziało' : 'Kliknij aby zakończyć'
           ) : (
-            'Kliknij aby zacząć mówić z AI'
+            isMobile ? 'Trzymaj przycisk podczas mówienia' : 'Kliknij aby zacząć mówić z AI'
           )}
         </p>
       </div>
@@ -259,14 +285,19 @@ export function LiveAudioRecorder({
       {isActive && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-          Mikrofon aktywny - mów swobodnie
+          {isMobile ? 'Mikrofon nasłuchuje...' : 'Mikrofon aktywny - mów swobodnie'}
         </div>
       )}
 
       {isMobile && !isActive && (
-        <p className="text-xs text-gray-400 text-center max-w-xs">
-          Na telefonie transkrypcja może działać tylko po angielsku
-        </p>
+        <div className="text-center max-w-xs space-y-2">
+          <p className="text-xs text-primary-600 font-medium bg-primary-50 px-3 py-2 rounded-lg">
+            💡 Push-to-talk: Przytrzymuj przycisk kiedy mówisz, puść aby AI odpowiedziało
+          </p>
+          <p className="text-xs text-gray-400">
+            Transkrypcja może działać tylko po angielsku
+          </p>
+        </div>
       )}
     </div>
   )
