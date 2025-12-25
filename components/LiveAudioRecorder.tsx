@@ -94,7 +94,10 @@ export function LiveAudioRecorder({
         // Resampleuj do 16kHz (Gemini wymaga 16kHz PCM)
         const pcmData = resampleTo16kHz(inputData, actualSampleRate)
 
-        onAudioData(pcmData.buffer)
+        // Kopiuj do nowego ArrayBuffer (pcmData.buffer to ArrayBufferLike)
+        const buffer = new ArrayBuffer(pcmData.byteLength)
+        new Int16Array(buffer).set(pcmData)
+        onAudioData(buffer)
       }
 
       source.connect(scriptProcessor)
