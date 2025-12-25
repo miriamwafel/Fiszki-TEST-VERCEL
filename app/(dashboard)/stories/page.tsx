@@ -40,15 +40,40 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
-    // Symulowany postęp dostosowany do ~45 sekund generowania historii
+    // Symulowany postęp: 0-90% w 45s, potem 90-99.99% w ~10s dodatkowych
+    const startTime = Date.now()
+
     const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) return prev // Zatrzymaj na 90% i czekaj na odpowiedź
-        if (prev < 30) return prev + 1.5 // Szybki start (~6s)
-        if (prev < 60) return prev + 0.75 // Średnie tempo (~12s)
-        return prev + 0.4 // Wolne tempo na końcu (~22s)
+      const elapsed = Date.now() - startTime
+
+      setProgress(() => {
+        // Faza 1: 0-90% w 45 sekund
+        if (elapsed < 45000) {
+          return (elapsed / 45000) * 90
+        }
+
+        const phase2Start = elapsed - 45000
+
+        // Faza 2: 90-99% w 5 sekund
+        if (phase2Start < 5000) {
+          return 90 + (phase2Start / 5000) * 9
+        }
+
+        // Faza 3: 99-99.9% w 3 sekundy
+        if (phase2Start < 8000) {
+          const phase3Elapsed = phase2Start - 5000
+          return 99 + (phase3Elapsed / 3000) * 0.9
+        }
+
+        // Faza 4: 99.9-99.99% w 2 sekundy
+        if (phase2Start < 10000) {
+          const phase4Elapsed = phase2Start - 8000
+          return 99.9 + (phase4Elapsed / 2000) * 0.09
+        }
+
+        return 99.99 // Zatrzymaj na 99.99%
       })
-    }, 300)
+    }, 100)
 
     return () => {
       clearInterval(messageInterval)
@@ -76,7 +101,9 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="text-sm text-gray-500 mt-2">{Math.round(progress)}%</p>
+      <p className="text-sm text-gray-500 mt-2">
+        {progress < 99 ? Math.round(progress) : progress.toFixed(2)}%
+      </p>
     </div>
   )
 }

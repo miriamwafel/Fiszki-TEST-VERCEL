@@ -52,7 +52,7 @@ const loadingMessages = [
   'Tworzymy kontekstowe ćwiczenia...',
 ]
 
-function LoadingSpinner({ message }: { message: string }) {
+function LoadingSpinner({ message, flashcardsCount = 10 }: { message: string, flashcardsCount?: number }) {
   const [dots, setDots] = useState('')
   const [progress, setProgress] = useState(0)
 
@@ -61,21 +61,49 @@ function LoadingSpinner({ message }: { message: string }) {
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
-    // Symulowany postęp dostosowany do ~15 sekund (1.5s na słówko dla średniego zestawu)
+    // Oblicz czas dla 0-90% na podstawie liczby słówek (1.5s na słówko)
+    const baseTimeMs = flashcardsCount * 1.5 * 1000 // w milisekundach
+    const startTime = Date.now()
+
+    // Symulowany postęp: 0-90% w (liczba_słówek * 1.5s), potem 90-99.99% w 20s
     const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) return prev // Zatrzymaj na 90% i czekaj na odpowiedź
-        if (prev < 30) return prev + 2.5 // Szybki start (~3s)
-        if (prev < 60) return prev + 1.5 // Średnie tempo (~5s)
-        return prev + 1 // Wolne tempo na końcu (~7.5s)
+      const elapsed = Date.now() - startTime
+
+      setProgress(() => {
+        // Faza 1: 0-90% w czasie zależnym od liczby słówek
+        if (elapsed < baseTimeMs) {
+          const phase1Progress = (elapsed / baseTimeMs) * 90
+          return Math.min(phase1Progress, 90)
+        }
+
+        const phase2Start = elapsed - baseTimeMs
+
+        // Faza 2: 90-99% w 10 sekund
+        if (phase2Start < 10000) {
+          return 90 + (phase2Start / 10000) * 9
+        }
+
+        // Faza 3: 99-99.9% w 7 sekund
+        if (phase2Start < 17000) {
+          const phase3Elapsed = phase2Start - 10000
+          return 99 + (phase3Elapsed / 7000) * 0.9
+        }
+
+        // Faza 4: 99.9-99.99% w 3 sekundy
+        if (phase2Start < 20000) {
+          const phase4Elapsed = phase2Start - 17000
+          return 99.9 + (phase4Elapsed / 3000) * 0.09
+        }
+
+        return 99.99 // Zatrzymaj na 99.99%
       })
-    }, 250)
+    }, 100)
 
     return () => {
       clearInterval(dotsInterval)
       clearInterval(progressInterval)
     }
-  }, [])
+  }, [flashcardsCount])
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
@@ -94,7 +122,9 @@ function LoadingSpinner({ message }: { message: string }) {
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="text-sm text-gray-500 mb-1">{Math.round(progress)}%</p>
+      <p className="text-sm text-gray-500 mb-1">
+        {progress < 99 ? Math.round(progress) : progress.toFixed(2)}%
+      </p>
       <p className="text-sm text-gray-400">To może potrwać kilka sekund</p>
     </div>
   )
@@ -432,7 +462,7 @@ export default function ExercisesPage() {
       {/* Loading state */}
       {generating && (
         <Card className="p-6 mb-6">
-          <LoadingSpinner message={loadingMessage} />
+          <LoadingSpinner message={loadingMessage} flashcardsCount={flashcards.length} />
         </Card>
       )}
 
