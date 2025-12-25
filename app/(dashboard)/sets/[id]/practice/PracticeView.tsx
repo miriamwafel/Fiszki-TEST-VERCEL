@@ -78,6 +78,13 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
 
   const currentCard = queue[currentIndex]
 
+  // Reset state when current card changes
+  useEffect(() => {
+    setShowResult(false)
+    setAnswer('')
+    setIsCorrect(false)
+  }, [currentIndex, currentCard?.id])
+
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (showResult || !currentCard) return
@@ -115,10 +122,6 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   }, [answer, currentCard, showResult])
 
   const handleNext = useCallback(() => {
-    setShowResult(false)
-    setAnswer('')
-    setIsCorrect(false)
-
     if (currentIndex < queue.length - 1) {
       setCurrentIndex((prev) => prev + 1)
     } else if (incorrectQueue.length > 0) {
@@ -134,12 +137,9 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   const handleRestart = () => {
     setQueue(shuffleArray(initialFlashcards))
     setIncorrectQueue([])
-    setCurrentIndex(0)
     setCompleted(false)
     setStats({ correct: 0, incorrect: 0 })
-    setShowResult(false)
-    setAnswer('')
-    setIsCorrect(false)
+    setCurrentIndex(0) // This will trigger the useEffect to reset other states
   }
 
   useEffect(() => {
