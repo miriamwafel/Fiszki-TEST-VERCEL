@@ -84,19 +84,12 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
     ws.onopen = () => {
       console.log('WebSocket connected, sending setup...')
 
-      // Wyślij konfigurację
+      // Wyślij konfigurację zgodnie z dokumentacją Google
       const setupMessage = {
         setup: {
           model: config.model,
           generationConfig: {
-            responseModalities: ['AUDIO', 'TEXT'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: {
-                  voiceName: 'Aoede' // Naturalny głos
-                }
-              }
-            }
+            responseModalities: ['AUDIO'],
           },
           systemInstruction: config.systemInstruction ? {
             parts: [{ text: config.systemInstruction }]
