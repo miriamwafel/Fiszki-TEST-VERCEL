@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/Button'
 import { Select } from '@/components/Select'
 import { Input } from '@/components/Input'
@@ -148,6 +149,7 @@ export default function StoriesPage() {
   const [selectedStory, setSelectedStory] = useState<Story | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const storyDisplayRef = useRef<HTMLDivElement>(null)
 
   const [language, setLanguage] = useState('en')
   const [difficulty, setDifficulty] = useState('A2')
@@ -205,6 +207,12 @@ export default function StoriesPage() {
 
   const handleGenerate = async () => {
     setGenerating(true)
+
+    // Auto-scroll do story display na mobile
+    setTimeout(() => {
+      storyDisplayRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+
     try {
       const response = await fetch('/api/stories', {
         method: 'POST',
@@ -532,7 +540,7 @@ export default function StoriesPage() {
         </Card>
 
         {/* Story display */}
-        <Card className="p-6 lg:col-span-2 relative">
+        <Card ref={storyDisplayRef} className="p-6 lg:col-span-2 relative">
           <AILoadingOverlay messages={storyLoadingMessages} isGenerating={generating} />
           <AILoadingOverlay messages={wordLoadingMessages} isGenerating={translatingWord} />
           {selectedStory ? (
@@ -557,9 +565,26 @@ export default function StoriesPage() {
                 </p>
               </div>
 
-              <p className="text-sm text-gray-500 italic">
-                Kliknij na słowo, aby zobaczyć tłumaczenie i dodać do zestawu fiszek.
-              </p>
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 mb-2 font-medium">
+                  💡 Jak korzystać z historyjki:
+                </p>
+                <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
+                  <li>Kliknij na dowolne słowo, aby sprawdzić jego znaczenie i dodać do zestawu fiszek</li>
+                  <li>Na dole znajdziesz słownik wyrazów i fraz z tej historii</li>
+                </ul>
+              </div>
+
+              <div className="mb-4">
+                <Link href="/sets">
+                  <button className="inline-flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    Przejdź do zestawów
+                  </button>
+                </Link>
+              </div>
 
               {selectedStory.vocabulary && selectedStory.vocabulary.length > 0 && (
                 <div className="mt-6 pt-6 border-t">

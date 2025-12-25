@@ -263,27 +263,9 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
             <p className="text-gray-500 mt-1">{set.description}</p>
           )}
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           {set.flashcards.length > 0 && (
             <>
-              <Link href={`/sets/${set.id}/tutor`}>
-                <Button>
-                  <svg
-                    className="w-5 h-5 mr-2"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-                    />
-                  </svg>
-                  Rozmowa z AI
-                </Button>
-              </Link>
               <Link href={`/sets/${set.id}/practice`}>
                 <Button variant="secondary">
                   <svg
@@ -299,7 +281,43 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                     />
                   </svg>
-                  Powtórki
+                  Powtórka
+                </Button>
+              </Link>
+              <Link href="/exercises">
+                <Button variant="secondary">
+                  <svg
+                    className="w-5 h-5 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+                    />
+                  </svg>
+                  Ćwiczenia
+                </Button>
+              </Link>
+              <Link href={`/sets/${set.id}/tutor`}>
+                <Button>
+                  <svg
+                    className="w-5 h-5 mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
+                  </svg>
+                  Rozmowa AI
                 </Button>
               </Link>
             </>

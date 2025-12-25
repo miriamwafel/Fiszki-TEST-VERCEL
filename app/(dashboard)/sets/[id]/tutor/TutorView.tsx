@@ -445,6 +445,22 @@ WAŻNE:
         </div>
       </div>
 
+      {/* BETA Info */}
+      <Card className="p-4 mb-4 bg-yellow-50 border-yellow-200">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <p className="text-sm font-semibold text-yellow-800 mb-1">
+              WERSJA BETA - W ROZWOJU
+            </p>
+            <p className="text-sm text-yellow-700">
+              Ta funkcja jest obecnie w fazie testów i będzie aktywnie rozwijana.
+              Możesz napotkać błędy lub ograniczenia. Twoje opinie pomogą nam ją ulepszyć!
+            </p>
+          </div>
+        </div>
+      </Card>
+
       {/* Flashcards info */}
       {set.flashcards.length > 0 && (
         <Card className="p-4 mb-4 bg-primary-50 border-primary-200">
