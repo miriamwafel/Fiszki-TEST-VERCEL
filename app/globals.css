@@ -120,3 +120,44 @@ body {
   border-color: #ef4444;
   color: #dc2626;
 }
+
+/* Smooth page transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Main content fade in */
+main {
+  animation: fadeIn 0.15s ease-out;
+}
+
+/* Link hover effects */
+a {
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Button press effect */
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+}

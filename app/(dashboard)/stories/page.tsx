@@ -122,6 +122,10 @@ export default function StoriesPage() {
   const [deletingStory, setDeletingStory] = useState(false)
   const [translatingWord, setTranslatingWord] = useState(false)
   const [topic, setTopic] = useState('')
+  const [showNewSetModal, setShowNewSetModal] = useState(false)
+  const [newSetName, setNewSetName] = useState('')
+  const [newSetLanguage, setNewSetLanguage] = useState('')
+  const [creatingSet, setCreatingSet] = useState(false)
 
   useEffect(() => {
     fetchStories()
@@ -210,6 +214,7 @@ export default function StoriesPage() {
           word: cleanWord,
           fromLanguage: selectedStory?.language || language,
           sentenceContext,
+          storyId: selectedStory?.id, // Przekaż storyId dla cache
         }),
       })
 
@@ -285,6 +290,39 @@ export default function StoriesPage() {
       alert('Nie udało się dodać fiszki')
     } finally {
       setAddingToSet(false)
+    }
+  }
+
+  const handleCreateSet = async () => {
+    if (!newSetName.trim() || !newSetLanguage) return
+
+    setCreatingSet(true)
+    try {
+      const response = await fetch('/api/sets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newSetName.trim(),
+          language: newSetLanguage,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
+      setSets((prev) => [data, ...prev])
+      setSelectedSet(data.id)
+      setShowNewSetModal(false)
+      setNewSetName('')
+      setNewSetLanguage('')
+    } catch (error) {
+      console.error('Failed to create set:', error)
+      alert('Nie udało się utworzyć zestawu')
+    } finally {
+      setCreatingSet(false)
     }
   }
 
@@ -583,19 +621,33 @@ export default function StoriesPage() {
 
             {sets.length > 0 ? (
               <>
-                <Select
-                  id="set"
-                  label="Wybierz zestaw"
-                  value={selectedSet}
-                  onChange={(e) => setSelectedSet(e.target.value)}
-                  options={[
-                    { value: '', label: 'Wybierz zestaw...' },
-                    ...sets.map((set) => ({
-                      value: set.id,
-                      label: `${set.name} (${set.language.toUpperCase()})`,
-                    })),
-                  ]}
-                />
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Select
+                      id="set"
+                      label="Wybierz zestaw"
+                      value={selectedSet}
+                      onChange={(e) => setSelectedSet(e.target.value)}
+                      options={[
+                        { value: '', label: 'Wybierz zestaw...' },
+                        ...sets.map((set) => ({
+                          value: set.id,
+                          label: `${set.name} (${set.language.toUpperCase()})`,
+                        })),
+                      ]}
+                    />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setNewSetLanguage(selectedStory?.language || language)
+                      setShowNewSetModal(true)
+                    }}
+                    className="mb-0 shrink-0"
+                  >
+                    + Nowy
+                  </Button>
+                </div>
 
                 <div className="mt-4 flex flex-col gap-2">
                   {wordModal.phrase && wordModal.phraseTranslation && (
@@ -635,9 +687,19 @@ export default function StoriesPage() {
                 </div>
               </>
             ) : (
-              <p className="text-gray-500 text-sm">
-                Nie masz jeszcze żadnych zestawów. Utwórz zestaw, aby móc dodawać słówka.
-              </p>
+              <div className="text-center py-4">
+                <p className="text-gray-500 text-sm mb-3">
+                  Nie masz jeszcze żadnych zestawów.
+                </p>
+                <Button
+                  onClick={() => {
+                    setNewSetLanguage(selectedStory?.language || language)
+                    setShowNewSetModal(true)
+                  }}
+                >
+                  Utwórz pierwszy zestaw
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -663,6 +725,45 @@ export default function StoriesPage() {
           >
             Usuń
           </Button>
+        </div>
+      </Modal>
+
+      {/* New set modal */}
+      <Modal
+        isOpen={showNewSetModal}
+        onClose={() => setShowNewSetModal(false)}
+        title="Utwórz nowy zestaw"
+      >
+        <div className="space-y-4">
+          <Input
+            id="newSetName"
+            label="Nazwa zestawu"
+            value={newSetName}
+            onChange={(e) => setNewSetName(e.target.value)}
+            placeholder="np. Podróże, Biznes, Codzienne..."
+          />
+          <Select
+            id="newSetLanguage"
+            label="Język"
+            value={newSetLanguage}
+            onChange={(e) => setNewSetLanguage(e.target.value)}
+            options={[
+              { value: '', label: 'Wybierz język...' },
+              ...languages,
+            ]}
+          />
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="secondary" onClick={() => setShowNewSetModal(false)}>
+              Anuluj
+            </Button>
+            <Button
+              onClick={handleCreateSet}
+              loading={creatingSet}
+              disabled={!newSetName.trim() || !newSetLanguage}
+            >
+              Utwórz zestaw
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

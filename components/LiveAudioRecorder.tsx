@@ -4,116 +4,142 @@ import { useCallback, useRef, useState, useEffect } from 'react'
 
 interface LiveAudioRecorderProps {
   onAudioData: (data: ArrayBuffer) => void
-  isRecording: boolean
-  onRecordingChange: (recording: boolean) => void
+  isActive: boolean // Czy rozmowa jest aktywna (ciągłe nagrywanie)
+  onActiveChange: (active: boolean) => void
   disabled?: boolean
+}
+
+// Funkcja do resamplingu audio z dowolnego sample rate do 16kHz
+function resampleTo16kHz(inputBuffer: Float32Array, inputSampleRate: number): Int16Array {
+  const targetSampleRate = 16000
+  const ratio = inputSampleRate / targetSampleRate
+  const outputLength = Math.floor(inputBuffer.length / ratio)
+  const output = new Int16Array(outputLength)
+
+  for (let i = 0; i < outputLength; i++) {
+    const srcIndex = Math.floor(i * ratio)
+    const sample = Math.max(-1, Math.min(1, inputBuffer[srcIndex]))
+    output[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+  }
+
+  return output
 }
 
 export function LiveAudioRecorder({
   onAudioData,
-  isRecording,
-  onRecordingChange,
+  isActive,
+  onActiveChange,
   disabled = false,
 }: LiveAudioRecorderProps) {
   const [isSupported, setIsSupported] = useState(true)
   const [permissionDenied, setPermissionDenied] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [isInitializing, setIsInitializing] = useState(false)
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const workletNodeRef = useRef<AudioWorkletNode | null>(null)
+  const processorRef = useRef<ScriptProcessorNode | null>(null)
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
 
-  // Sprawdź wsparcie
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!navigator.mediaDevices?.getUserMedia) {
       setIsSupported(false)
     }
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent))
   }, [])
 
   const startRecording = useCallback(async () => {
+    setIsInitializing(true)
     try {
-      // Pobierz dostęp do mikrofonu
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         },
       })
 
       streamRef.current = stream
 
-      // Utwórz AudioContext
-      const audioContext = new AudioContext({ sampleRate: 16000 })
+      // @ts-expect-error - webkitAudioContext dla starszych Safari
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext
+      const audioContext = new AudioContextClass()
       audioContextRef.current = audioContext
 
-      // Utwórz source z mikrofonu
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+
+      const actualSampleRate = audioContext.sampleRate
+      console.log('Audio context sample rate:', actualSampleRate)
+
       const source = audioContext.createMediaStreamSource(stream)
       sourceRef.current = source
 
-      // Użyj ScriptProcessorNode (deprecated ale szeroko wspierany)
-      // W przyszłości można zamienić na AudioWorklet
       const bufferSize = 4096
       const scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1)
+      processorRef.current = scriptProcessor
 
       scriptProcessor.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0)
-
-        // Konwertuj Float32Array na Int16Array (PCM 16-bit)
-        const pcmData = new Int16Array(inputData.length)
-        for (let i = 0; i < inputData.length; i++) {
-          // Clamp do zakresu [-1, 1] i skaluj do Int16
-          const s = Math.max(-1, Math.min(1, inputData[i]))
-          pcmData[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-        }
-
-        onAudioData(pcmData.buffer)
+        const pcmData = resampleTo16kHz(inputData, actualSampleRate)
+        const buffer = new ArrayBuffer(pcmData.byteLength)
+        new Int16Array(buffer).set(pcmData)
+        onAudioData(buffer)
       }
 
       source.connect(scriptProcessor)
       scriptProcessor.connect(audioContext.destination)
 
-      onRecordingChange(true)
+      onActiveChange(true)
       setPermissionDenied(false)
     } catch (error) {
       console.error('Error starting recording:', error)
-      if ((error as Error).name === 'NotAllowedError') {
+      if ((error as Error).name === 'NotAllowedError' || (error as Error).name === 'PermissionDeniedError') {
         setPermissionDenied(true)
       }
-      onRecordingChange(false)
+      onActiveChange(false)
+    } finally {
+      setIsInitializing(false)
     }
-  }, [onAudioData, onRecordingChange])
+  }, [onAudioData, onActiveChange])
 
   const stopRecording = useCallback(() => {
-    // Zatrzymaj wszystkie tracki
+    if (processorRef.current && sourceRef.current) {
+      try {
+        sourceRef.current.disconnect()
+        processorRef.current.disconnect()
+      } catch {
+        // Ignore
+      }
+    }
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop())
       streamRef.current = null
     }
 
-    // Zamknij AudioContext
     if (audioContextRef.current) {
       audioContextRef.current.close()
       audioContextRef.current = null
     }
 
     sourceRef.current = null
-    workletNodeRef.current = null
+    processorRef.current = null
 
-    onRecordingChange(false)
-  }, [onRecordingChange])
+    onActiveChange(false)
+  }, [onActiveChange])
 
-  const toggleRecording = useCallback(() => {
-    if (isRecording) {
+  const toggleConversation = useCallback(() => {
+    if (isActive) {
       stopRecording()
     } else {
       startRecording()
     }
-  }, [isRecording, startRecording, stopRecording])
+  }, [isActive, startRecording, stopRecording])
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopRecording()
@@ -125,6 +151,7 @@ export function LiveAudioRecorder({
       <div className="text-center p-4 bg-yellow-50 rounded-lg">
         <p className="text-yellow-700 text-sm">
           Twoja przeglądarka nie obsługuje nagrywania audio.
+          {isMobile && ' Spróbuj otworzyć w Chrome lub Safari.'}
         </p>
       </div>
     )
@@ -134,7 +161,12 @@ export function LiveAudioRecorder({
     return (
       <div className="text-center p-4 bg-red-50 rounded-lg">
         <p className="text-red-700 text-sm">
-          Brak dostępu do mikrofonu. Sprawdź uprawnienia przeglądarki.
+          Brak dostępu do mikrofonu.
+          {isMobile ? (
+            <> Sprawdź ustawienia przeglądarki i systemu.</>
+          ) : (
+            <> Kliknij ikonę kłódki w pasku adresu i zezwól na mikrofon.</>
+          )}
         </p>
         <button
           onClick={startRecording}
@@ -147,65 +179,91 @@ export function LiveAudioRecorder({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-4">
       <button
-        onClick={toggleRecording}
-        disabled={disabled}
+        onClick={toggleConversation}
+        disabled={disabled || isInitializing}
         className={`
-          relative w-24 h-24 rounded-full transition-all duration-300
+          relative w-32 h-32 rounded-full transition-all duration-500
           flex items-center justify-center
-          ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          ${disabled || isInitializing ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
           ${
-            isRecording
-              ? 'bg-red-500 hover:bg-red-600 shadow-xl shadow-red-500/50'
-              : 'bg-primary-500 hover:bg-primary-600 shadow-lg shadow-primary-500/30'
+            isActive
+              ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-2xl shadow-red-500/50 scale-110'
+              : 'bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary-500/30 hover:scale-105'
           }
         `}
       >
-        {/* Animowany ring podczas nagrywania */}
-        {isRecording && (
+        {/* Animacje podczas aktywnej rozmowy */}
+        {isActive && (
           <>
             <span className="absolute inset-0 rounded-full bg-red-400 animate-ping opacity-20" />
-            <span className="absolute inset-1 rounded-full border-4 border-red-300 animate-pulse opacity-60" />
+            <span className="absolute inset-2 rounded-full border-4 border-white/30 animate-pulse" />
+            {/* Fale dźwiękowe */}
+            <span className="absolute inset-[-8px] rounded-full border-2 border-red-300/50 animate-[ping_1.5s_ease-in-out_infinite]" />
+            <span className="absolute inset-[-16px] rounded-full border-2 border-red-300/30 animate-[ping_2s_ease-in-out_infinite]" />
           </>
         )}
 
-        {/* Ikona */}
-        <svg
-          className="w-10 h-10 text-white relative z-10"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          {isRecording ? (
-            // Ikona fali dźwiękowej (mówimy)
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4M12 3a3 3 0 00-3 3v4a3 3 0 006 0V6a3 3 0 00-3-3z"
-            />
-          ) : (
-            // Ikona mikrofonu
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
-            />
-          )}
-        </svg>
+        {isInitializing ? (
+          <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+        ) : (
+          <svg
+            className="w-12 h-12 text-white relative z-10"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            {isActive ? (
+              // Ikona stop (kwadrat)
+              <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+            ) : (
+              // Ikona mikrofonu
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+              />
+            )}
+          </svg>
+        )}
       </button>
 
-      <p className="text-sm text-gray-500 text-center">
-        {isRecording ? (
-          <span className="text-red-600 font-medium">
-            Mówię... (kliknij aby zatrzymać)
-          </span>
-        ) : (
-          'Kliknij aby rozpocząć rozmowę'
-        )}
-      </p>
+      <div className="text-center">
+        <p className={`text-lg font-medium ${isActive ? 'text-red-600' : 'text-gray-700'}`}>
+          {isInitializing ? (
+            'Uruchamianie mikrofonu...'
+          ) : isActive ? (
+            'Rozmowa aktywna'
+          ) : (
+            'Rozpocznij rozmowę'
+          )}
+        </p>
+        <p className="text-sm text-gray-500 mt-1">
+          {isActive ? (
+            'Kliknij aby zakończyć'
+          ) : (
+            'Kliknij aby zacząć mówić z AI'
+          )}
+        </p>
+      </div>
+
+      {isActive && (
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          Mikrofon aktywny - mów swobodnie
+        </div>
+      )}
+
+      {isMobile && !isActive && (
+        <p className="text-xs text-gray-400 text-center max-w-xs">
+          Na telefonie transkrypcja może działać tylko po angielsku
+        </p>
+      )}
     </div>
   )
 }
+
+// Eksport dla kompatybilności wstecznej
+export { LiveAudioRecorder as default }

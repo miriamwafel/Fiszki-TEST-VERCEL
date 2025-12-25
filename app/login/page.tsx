@@ -16,6 +16,8 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return // Zapobiegaj wielokrotnemu kliknięciu
+
     setError('')
     setLoading(true)
 
@@ -28,13 +30,13 @@ export default function LoginPage() {
 
       if (result?.error) {
         setError(result.error)
+        setLoading(false)
       } else {
-        router.push('/dashboard')
-        router.refresh()
+        // Użyj window.location dla pewnego przekierowania
+        window.location.href = '/dashboard'
       }
     } catch {
       setError('Wystąpił błąd podczas logowania')
-    } finally {
       setLoading(false)
     }
   }
