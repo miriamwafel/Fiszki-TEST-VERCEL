@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { language, wordCount, difficulty } = await request.json()
+    const { language, wordCount, difficulty, topic } = await request.json()
 
     if (!language || !wordCount || !difficulty) {
       return NextResponse.json(
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
     const languageName = languageNames[language] || language
 
-    const storyResult = await generateStory(languageName, wordCount, difficulty)
+    const storyResult = await generateStory(languageName, wordCount, difficulty, topic)
 
     const story = await prisma.story.create({
       data: {

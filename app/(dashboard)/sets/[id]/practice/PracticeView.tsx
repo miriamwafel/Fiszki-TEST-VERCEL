@@ -112,6 +112,7 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   const handleNext = useCallback(() => {
     setShowResult(false)
     setAnswer('')
+    setIsCorrect(false)
 
     if (currentIndex < queue.length - 1) {
       setCurrentIndex((prev) => prev + 1)
@@ -133,6 +134,7 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     setStats({ correct: 0, incorrect: 0 })
     setShowResult(false)
     setAnswer('')
+    setIsCorrect(false)
   }
 
   useEffect(() => {

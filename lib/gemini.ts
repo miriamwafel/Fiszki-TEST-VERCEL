@@ -58,7 +58,8 @@ export interface StoryResult {
 export async function generateStory(
   language: string,
   wordCount: number,
-  difficulty: string
+  difficulty: string,
+  topic?: string
 ): Promise<StoryResult> {
   const difficultyDescriptions: Record<string, string> = {
     'A1': 'bardzo prosty, podstawowe słownictwo, proste zdania',
@@ -69,12 +70,14 @@ export async function generateStory(
     'C2': 'poziom native, skomplikowane słownictwo i styl',
   }
 
+  const topicText = topic ? `- Temat: ${topic}\n` : ''
+
   const prompt = `Napisz krótką historię/opowiadanie w języku ${language}.
 
 Wymagania:
 - Około ${wordCount} słów
 - Poziom trudności: ${difficulty} (${difficultyDescriptions[difficulty] || difficulty})
-- Historia powinna być interesująca i angażująca
+${topicText}- Historia powinna być interesująca i angażująca
 - Używaj różnorodnego słownictwa odpowiedniego do poziomu
 
 Odpowiedz w formacie JSON:

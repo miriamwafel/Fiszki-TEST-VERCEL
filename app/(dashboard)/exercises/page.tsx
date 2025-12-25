@@ -22,6 +22,7 @@ interface GapExercise {
   sentence: string
   word: string
   hint: string
+  flashcardId: string
 }
 
 interface SentenceExercise {
@@ -41,12 +42,12 @@ export default function ExercisesPage() {
 
   const [exerciseType, setExerciseType] = useState<ExerciseType>('gap')
   const [currentFlashcard, setCurrentFlashcard] = useState<Flashcard | null>(null)
-  const [gapExercise, setGapExercise] = useState<GapExercise | null>(null)
+  const [gapExercises, setGapExercises] = useState<GapExercise[]>([])
   const [sentenceExercise, setSentenceExercise] = useState<SentenceExercise | null>(null)
   const [generating, setGenerating] = useState(false)
 
-  const [gapAnswer, setGapAnswer] = useState('')
-  const [gapResult, setGapResult] = useState<'correct' | 'incorrect' | null>(null)
+  const [gapAnswers, setGapAnswers] = useState<Record<string, string>>({})
+  const [gapResults, setGapResults] = useState<Record<string, 'correct' | 'incorrect'>>({})
 
   const [sentenceAnswer, setSentenceAnswer] = useState('')
   const [sentenceResult, setSentenceResult] = useState<{
@@ -95,39 +96,52 @@ export default function ExercisesPage() {
   }
 
   const generateExercise = async () => {
-    const flashcard = getRandomFlashcard()
-    if (!flashcard) return
+    if (flashcards.length === 0) return
 
-    setCurrentFlashcard(flashcard)
     setGenerating(true)
-    setGapResult(null)
+    setGapResults({})
     setSentenceResult(null)
-    setGapAnswer('')
+    setGapAnswers({})
     setSentenceAnswer('')
 
     const set = sets.find((s) => s.id === selectedSetId)
 
     try {
       if (exerciseType === 'gap') {
-        const response = await fetch('/api/exercises/gap', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            word: flashcard.word,
-            translation: flashcard.translation,
-            language: set?.language,
-          }),
-        })
+        // Generate gap exercises for ALL flashcards
+        const exercises = await Promise.all(
+          flashcards.map(async (flashcard) => {
+            const response = await fetch('/api/exercises/gap', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                word: flashcard.word,
+                translation: flashcard.translation,
+                language: set?.language,
+              }),
+            })
 
-        const data = await response.json()
+            const data = await response.json()
 
-        if (!response.ok) {
-          throw new Error(data.error)
-        }
+            if (!response.ok) {
+              throw new Error(data.error)
+            }
 
-        setGapExercise(data)
+            return {
+              ...data,
+              flashcardId: flashcard.id,
+            }
+          })
+        )
+
+        setGapExercises(exercises)
         setSentenceExercise(null)
       } else {
+        const flashcard = getRandomFlashcard()
+        if (!flashcard) return
+
+        setCurrentFlashcard(flashcard)
+
         const response = await fetch('/api/exercises/sentence', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -145,7 +159,7 @@ export default function ExercisesPage() {
         }
 
         setSentenceExercise(data)
-        setGapExercise(null)
+        setGapExercises([])
       }
     } catch (error) {
       console.error('Failed to generate exercise:', error)
@@ -155,13 +169,23 @@ export default function ExercisesPage() {
     }
   }
 
-  const checkGapAnswer = () => {
-    if (!gapExercise) return
+  const checkGapAnswer = (exerciseId: string, word: string) => {
+    const answer = gapAnswers[exerciseId] || ''
+    const normalizedAnswer = answer.trim().toLowerCase()
+    const normalizedWord = word.toLowerCase()
 
-    const normalizedAnswer = gapAnswer.trim().toLowerCase()
-    const normalizedWord = gapExercise.word.toLowerCase()
+    setGapResults((prev) => ({
+      ...prev,
+      [exerciseId]: normalizedAnswer === normalizedWord ? 'correct' : 'incorrect',
+    }))
+  }
 
-    setGapResult(normalizedAnswer === normalizedWord ? 'correct' : 'incorrect')
+  const checkAllGapAnswers = () => {
+    gapExercises.forEach((exercise) => {
+      if (!gapResults[exercise.flashcardId]) {
+        checkGapAnswer(exercise.flashcardId, exercise.word)
+      }
+    })
   }
 
   const checkSentenceAnswer = async () => {
@@ -197,29 +221,62 @@ export default function ExercisesPage() {
     }
   }
 
-  const renderGapSentence = () => {
-    if (!gapExercise) return null
-
-    const parts = gapExercise.sentence.split('_____')
+  const renderGapSentence = (exercise: GapExercise, index: number) => {
+    const parts = exercise.sentence.split('_____')
+    const result = gapResults[exercise.flashcardId]
 
     return (
-      <p className="text-lg text-gray-700">
-        {parts[0]}
-        <input
-          type="text"
-          value={gapAnswer}
-          onChange={(e) => setGapAnswer(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !gapResult) {
-              checkGapAnswer()
+      <div key={exercise.flashcardId} className="mb-4">
+        <p className="text-sm text-gray-500 mb-2">
+          {index + 1}. Uzupełnij lukę:{' '}
+          <span className="font-medium">{flashcards.find((f) => f.id === exercise.flashcardId)?.translation}</span>
+        </p>
+        <p className="text-lg text-gray-700">
+          {parts[0]}
+          <input
+            type="text"
+            value={gapAnswers[exercise.flashcardId] || ''}
+            onChange={(e) =>
+              setGapAnswers((prev) => ({
+                ...prev,
+                [exercise.flashcardId]: e.target.value,
+              }))
             }
-          }}
-          disabled={!!gapResult}
-          className={`gap-input ${gapResult || ''}`}
-          autoFocus
-        />
-        {parts[1]}
-      </p>
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !result) {
+                e.preventDefault()
+                checkGapAnswer(exercise.flashcardId, exercise.word)
+              }
+            }}
+            disabled={!!result}
+            className={`gap-input ${result || ''}`}
+            autoFocus={index === 0}
+          />
+          {parts[1]}
+        </p>
+        <p className="text-sm text-gray-400 mt-1 italic">Podpowiedź: {exercise.hint}</p>
+        {result && (
+          <div
+            className={`mt-2 p-2 rounded-lg text-sm ${
+              result === 'correct'
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
+            }`}
+          >
+            {result === 'correct' ? (
+              <p className="font-semibold">Poprawnie!</p>
+            ) : (
+              <div>
+                <p className="font-semibold mb-1">Niepoprawnie</p>
+                <p>
+                  Poprawna odpowiedź:{' '}
+                  <span className="font-semibold">{exercise.word}</span>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     )
   }
 
@@ -272,12 +329,29 @@ export default function ExercisesPage() {
           disabled={!selectedSetId}
           loading={generating}
         >
-          {gapExercise || sentenceExercise ? 'Następne ćwiczenie' : 'Generuj ćwiczenie'}
+          {gapExercises.length > 0 || sentenceExercise ? 'Następne ćwiczenie' : 'Generuj ćwiczenie'}
         </Button>
       </Card>
 
-      {/* Gap exercise */}
-      {gapExercise && (
+      {/* Loading state */}
+      {generating && (
+        <Card className="p-8 text-center">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="spinner w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full" />
+            <div className="flex items-center space-x-1">
+              <span className="text-gray-600 font-medium">Przygotowujemy dla ciebie zadanie</span>
+              <span className="flex space-x-1">
+                <span className="animate-bounce" style={{ animationDelay: '0ms' }}>.</span>
+                <span className="animate-bounce" style={{ animationDelay: '150ms' }}>.</span>
+                <span className="animate-bounce" style={{ animationDelay: '300ms' }}>.</span>
+              </span>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Gap exercises */}
+      {!generating && gapExercises.length > 0 && (
         <Card className="p-6 mb-6">
           <div className="mb-4">
             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
@@ -285,49 +359,24 @@ export default function ExercisesPage() {
             </span>
           </div>
 
-          <p className="text-sm text-gray-500 mb-4">
-            Uzupełnij lukę odpowiednim słowem:{' '}
-            <span className="font-medium">{currentFlashcard?.translation}</span>
+          <p className="text-sm text-gray-500 mb-6">
+            Uzupełnij luki odpowiednimi słowami. Możesz sprawdzać odpowiedzi pojedynczo (Enter) lub wszystkie naraz.
           </p>
 
-          {renderGapSentence()}
+          <div className="space-y-6">
+            {gapExercises.map((exercise, index) => renderGapSentence(exercise, index))}
+          </div>
 
-          <p className="text-sm text-gray-400 mt-2 italic">
-            Podpowiedź: {gapExercise.hint}
-          </p>
-
-          {!gapResult && (
-            <div className="mt-4">
-              <Button onClick={checkGapAnswer}>Sprawdź</Button>
-            </div>
-          )}
-
-          {gapResult && (
-            <div
-              className={`mt-4 p-4 rounded-lg ${
-                gapResult === 'correct'
-                  ? 'bg-green-50 text-green-700'
-                  : 'bg-red-50 text-red-700'
-              }`}
-            >
-              {gapResult === 'correct' ? (
-                <p className="font-semibold">Poprawnie!</p>
-              ) : (
-                <div>
-                  <p className="font-semibold mb-1">Niepoprawnie</p>
-                  <p>
-                    Poprawna odpowiedź:{' '}
-                    <span className="font-semibold">{gapExercise.word}</span>
-                  </p>
-                </div>
-              )}
+          {Object.keys(gapResults).length < gapExercises.length && (
+            <div className="mt-6 pt-4 border-t">
+              <Button onClick={checkAllGapAnswers}>Sprawdź wszystkie</Button>
             </div>
           )}
         </Card>
       )}
 
       {/* Sentence exercise */}
-      {sentenceExercise && (
+      {!generating && sentenceExercise && (
         <Card className="p-6 mb-6">
           <div className="mb-4">
             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
