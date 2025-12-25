@@ -19,6 +19,11 @@ interface Flashcard {
   translation: string
   context?: string | null
   partOfSpeech?: string | null
+  infinitive?: string | null
+  verbForm?: string | null
+  verbTense?: string | null
+  verbPerson?: string | null
+  grammaticalInfo?: string | null
   stats: PracticeStats | null
 }
 
@@ -245,6 +250,16 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
           <p className="text-3xl font-bold text-gray-900">
             {currentCard.translation}
           </p>
+          {currentCard.grammaticalInfo && (
+            <p className="text-sm text-blue-600 italic mt-2">
+              📖 {currentCard.grammaticalInfo}
+            </p>
+          )}
+          {currentCard.infinitive && !currentCard.grammaticalInfo && (
+            <p className="text-sm text-gray-500 mt-2">
+              Bezokolicznik: <strong>{currentCard.infinitive}</strong>
+            </p>
+          )}
           {currentCard.context && (
             <p className="text-gray-500 mt-2">{currentCard.context}</p>
           )}
@@ -277,6 +292,16 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
                     Poprawna odpowiedź:{' '}
                     <span className="font-semibold">{currentCard.word}</span>
                   </p>
+                  {currentCard.infinitive && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Bezokolicznik: <strong>{currentCard.infinitive}</strong>
+                    </p>
+                  )}
+                  {currentCard.grammaticalInfo && (
+                    <p className="text-sm text-blue-500 italic mt-1">
+                      {currentCard.grammaticalInfo}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

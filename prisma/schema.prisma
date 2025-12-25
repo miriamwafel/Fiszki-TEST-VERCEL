@@ -43,6 +43,10 @@ model Flashcard {
   context         String?  // dodatkowy kontekst (np. bezokolicznik, przykład użycia)
   partOfSpeech    String?  // część mowy (verb, noun, adjective, etc.)
   infinitive      String?  // bezokolicznik (dla czasowników)
+  verbForm        String?  // forma czasownika (np. "past participle", "present simple 3rd person")
+  verbTense       String?  // czas czasownika (present, past, future, etc.)
+  verbPerson      String?  // osoba (1st person singular, 3rd person plural, etc.)
+  grammaticalInfo String?  // dodatkowe informacje gramatyczne
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

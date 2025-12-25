@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { setId, word, translation, context, partOfSpeech, infinitive } = await request.json()
+    const { setId, word, translation, context, partOfSpeech, infinitive, verbForm, verbTense, verbPerson, grammaticalInfo } = await request.json()
 
     if (!setId || !word || !translation) {
       return NextResponse.json(
@@ -39,6 +39,10 @@ export async function POST(request: Request) {
         context,
         partOfSpeech,
         infinitive,
+        verbForm,
+        verbTense,
+        verbPerson,
+        grammaticalInfo,
         setId,
       },
     })

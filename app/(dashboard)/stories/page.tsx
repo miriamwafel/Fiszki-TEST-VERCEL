@@ -59,6 +59,10 @@ export default function StoriesPage() {
     partOfSpeech?: string
     context?: string
     infinitive?: string
+    verbForm?: string
+    verbTense?: string
+    verbPerson?: string
+    grammaticalInfo?: string
     suggestInfinitive?: boolean
   }
 
@@ -150,6 +154,10 @@ export default function StoriesPage() {
         partOfSpeech: data.partOfSpeech,
         context: data.context,
         infinitive: data.infinitive,
+        verbForm: data.verbForm,
+        verbTense: data.verbTense,
+        verbPerson: data.verbPerson,
+        grammaticalInfo: data.grammaticalInfo,
         suggestInfinitive: data.suggestInfinitive,
       })
     } catch (error) {
@@ -172,6 +180,13 @@ export default function StoriesPage() {
           setId: selectedSet,
           word: wordToAdd,
           translation: wordModal.translation,
+          context: wordModal.context,
+          partOfSpeech: wordModal.partOfSpeech,
+          infinitive: useInfinitive ? null : wordModal.infinitive,
+          verbForm: useInfinitive ? null : wordModal.verbForm,
+          verbTense: useInfinitive ? null : wordModal.verbTense,
+          verbPerson: useInfinitive ? null : wordModal.verbPerson,
+          grammaticalInfo: useInfinitive ? null : wordModal.grammaticalInfo,
         }),
       })
 
@@ -397,11 +412,20 @@ export default function StoriesPage() {
               </div>
               <p className="text-primary-600 font-medium mb-2">{wordModal.translation}</p>
 
+              {wordModal.grammaticalInfo && (
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <p className="text-sm text-blue-600 italic">
+                    <span className="font-medium">📖 Forma gramatyczna:</span>{' '}
+                    {wordModal.grammaticalInfo}
+                  </p>
+                </div>
+              )}
+
               {wordModal.infinitive && (
                 <div className="mt-3 pt-3 border-t border-gray-200">
                   <p className="text-sm text-gray-600">
                     <span className="font-medium">Forma podstawowa (bezokolicznik):</span>{' '}
-                    {wordModal.infinitive}
+                    <strong>{wordModal.infinitive}</strong>
                   </p>
                 </div>
               )}

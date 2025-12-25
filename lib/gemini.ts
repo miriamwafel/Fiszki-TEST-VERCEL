@@ -12,6 +12,10 @@ export interface TranslationResult {
   partOfSpeech: string
   context?: string
   infinitive?: string
+  verbForm?: string
+  verbTense?: string
+  verbPerson?: string
+  grammaticalInfo?: string
   hasMultipleMeanings: boolean
   alternativeMeanings?: string[]
   suggestInfinitive?: boolean
@@ -28,12 +32,18 @@ Odpowiedz w formacie JSON:
   "word": "${word}",
   "translation": "tłumaczenie po polsku",
   "partOfSpeech": "część mowy (np. verb, noun, adjective, adverb)",
-  "context": "dodatkowy kontekst lub przykład użycia",
+  "context": "dodatkowy kontekst lub przykład użycia w kontekście zdania",
   "infinitive": "jeśli to czasownik w formie odmienionej, podaj bezokolicznik, w przeciwnym razie null",
+  "verbForm": "jeśli to odmieniony czasownik, opisz formę (np. 'past participle', 'present simple', 'past continuous'), w przeciwnym razie null",
+  "verbTense": "jeśli to czasownik, podaj czas (present, past, future, present perfect, past perfect, conditional, itp.), w przeciwnym razie null",
+  "verbPerson": "jeśli to odmieniony czasownik, podaj osobę i liczbę (np. '1st person singular', '3rd person plural', '2nd person singular'), w przeciwnym razie null",
+  "grammaticalInfo": "jeśli to czasownik odmieniony, opisz szczegółowo formę w kontekście (np. 'czasownik w czasie przeszłym prostym, 3. osoba liczby pojedynczej' lub 'imiesłów bierny czasu przeszłego'), w przeciwnym razie null",
   "hasMultipleMeanings": true/false,
   "alternativeMeanings": ["alternatywne znaczenie 1", "alternatywne znaczenie 2"],
   "suggestInfinitive": true jeśli słowo to odmieniony czasownik i warto dodać bezokolicznik jako osobną fiszkę
 }
+
+WAŻNE: Jeśli słowo to czasownik w jakiejkolwiek formie odmienionej (nie bezokolicznik), wypełnij wszystkie pola związane z czasownikiem (verbForm, verbTense, verbPerson, grammaticalInfo).
 
 Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
 

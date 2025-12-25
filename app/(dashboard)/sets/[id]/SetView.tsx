@@ -15,6 +15,10 @@ interface Flashcard {
   context?: string | null
   partOfSpeech?: string | null
   infinitive?: string | null
+  verbForm?: string | null
+  verbTense?: string | null
+  verbPerson?: string | null
+  grammaticalInfo?: string | null
 }
 
 interface FlashcardSet {
@@ -31,6 +35,10 @@ interface TranslationResult {
   partOfSpeech: string
   context?: string
   infinitive?: string
+  verbForm?: string
+  verbTense?: string
+  verbPerson?: string
+  grammaticalInfo?: string
   hasMultipleMeanings: boolean
   alternativeMeanings?: string[]
   suggestInfinitive?: boolean
@@ -80,7 +88,11 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
     translation: string,
     context?: string,
     partOfSpeech?: string,
-    infinitive?: string
+    infinitive?: string,
+    verbForm?: string,
+    verbTense?: string,
+    verbPerson?: string,
+    grammaticalInfo?: string
   ) => {
     try {
       const response = await fetch('/api/flashcards', {
@@ -93,6 +105,10 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
           context,
           partOfSpeech,
           infinitive,
+          verbForm,
+          verbTense,
+          verbPerson,
+          grammaticalInfo,
         }),
       })
 
@@ -248,6 +264,16 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                     {translationResult.context}
                   </p>
                 )}
+                {translationResult.grammaticalInfo && (
+                  <p className="text-xs text-blue-600 mt-2 italic">
+                    📖 {translationResult.grammaticalInfo}
+                  </p>
+                )}
+                {translationResult.infinitive && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Bezokolicznik: <strong>{translationResult.infinitive}</strong>
+                  </p>
+                )}
               </div>
               <Button
                 size="sm"
@@ -257,7 +283,11 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                     translationResult.translation,
                     translationResult.context,
                     translationResult.partOfSpeech,
-                    translationResult.infinitive
+                    translationResult.infinitive,
+                    translationResult.verbForm,
+                    translationResult.verbTense,
+                    translationResult.verbPerson,
+                    translationResult.grammaticalInfo
                   )
                 }
               >
@@ -350,6 +380,16 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                     {flashcard.context && (
                       <p className="text-sm text-gray-500 mt-1">
                         {flashcard.context}
+                      </p>
+                    )}
+                    {flashcard.infinitive && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Bezokolicznik: {flashcard.infinitive}
+                      </p>
+                    )}
+                    {flashcard.grammaticalInfo && (
+                      <p className="text-xs text-blue-500 mt-1 italic">
+                        {flashcard.grammaticalInfo}
                       </p>
                     )}
                   </div>
