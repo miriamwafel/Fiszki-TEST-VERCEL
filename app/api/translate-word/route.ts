@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { gemini } from '@/lib/gemini'
+import { gemini, VocabularyEntry } from '@/lib/gemini'
 import prisma from '@/lib/db'
 
 export async function POST(request: Request) {
-  let cachedTranslation: string | null = null
+  let cachedEntry: VocabularyEntry | null = null
   let word: string = ''
 
   try {
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Pobierz cache dla fallbacku
+    // Sprawdź rozszerzony cache w historyjce
     if (storyId) {
       const story = await prisma.story.findUnique({
         where: { id: storyId },
@@ -34,14 +34,41 @@ export async function POST(request: Request) {
       })
 
       if (story?.vocabulary) {
-        const vocab = story.vocabulary as Record<string, string>
+        const vocab = story.vocabulary as Record<string, VocabularyEntry | string>
         const wordLower = word.toLowerCase()
         const cleanWord = wordLower.replace(/[.,!?;:'"„"«»\-–—()[\]{}]/g, '')
-        cachedTranslation = vocab[wordLower] || vocab[cleanWord] || vocab[word] || null
+
+        const cached = vocab[wordLower] || vocab[cleanWord] || vocab[word]
+
+        if (cached) {
+          // Obsłuż stary format (string) i nowy format (VocabularyEntry)
+          if (typeof cached === 'string') {
+            cachedEntry = { translation: cached }
+          } else {
+            cachedEntry = cached
+          }
+        }
       }
     }
 
-    // Zawsze używaj AI dla pełnej analizy (czasowniki, frazy, kontekst)
+    // Jeśli mamy rozszerzony cache z pełnymi danymi - zwróć NATYCHMIAST
+    if (cachedEntry && cachedEntry.partOfSpeech) {
+      return NextResponse.json({
+        word,
+        translation: cachedEntry.translation,
+        partOfSpeech: cachedEntry.partOfSpeech || null,
+        context: null,
+        infinitive: cachedEntry.infinitive || null,
+        infinitiveTranslation: cachedEntry.infinitiveTranslation || null,
+        tenseInfo: cachedEntry.tenseInfo || null,
+        suggestInfinitive: !!cachedEntry.infinitive,
+        phrase: null,
+        phraseTranslation: null,
+        fromCache: true
+      })
+    }
+
+    // Jeśli nie ma cache lub cache jest podstawowy - użyj AI
     const languageNames: Record<string, string> = {
       en: 'angielskiego',
       de: 'niemieckiego',
@@ -104,7 +131,7 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
       // Fallback - użyj cache jeśli jest
       return NextResponse.json({
         word,
-        translation: cachedTranslation || response.trim(),
+        translation: cachedEntry?.translation || response.trim(),
         partOfSpeech: null,
         context: null,
         infinitive: null,
@@ -122,16 +149,16 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
     console.error('Translate word error:', error)
 
     // Jeśli AI zawiedzie ale mamy cache - użyj go
-    if (cachedTranslation) {
+    if (cachedEntry) {
       return NextResponse.json({
         word,
-        translation: cachedTranslation,
-        partOfSpeech: null,
+        translation: cachedEntry.translation,
+        partOfSpeech: cachedEntry.partOfSpeech || null,
         context: null,
-        infinitive: null,
-        infinitiveTranslation: null,
-        tenseInfo: null,
-        suggestInfinitive: false,
+        infinitive: cachedEntry.infinitive || null,
+        infinitiveTranslation: cachedEntry.infinitiveTranslation || null,
+        tenseInfo: cachedEntry.tenseInfo || null,
+        suggestInfinitive: !!cachedEntry.infinitive,
         phrase: null,
         phraseTranslation: null,
         fromCache: true

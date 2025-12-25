@@ -49,11 +49,20 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
   return JSON.parse(jsonMatch[0])
 }
 
+// Rozszerzone dane słownictwa dla natychmiastowego tłumaczenia
+export interface VocabularyEntry {
+  translation: string
+  partOfSpeech?: string // verb, noun, adjective, etc.
+  infinitive?: string // dla czasowników - forma podstawowa
+  infinitiveTranslation?: string // tłumaczenie bezokolicznika
+  tenseInfo?: string // np. "czas przeszły, 3 osoba"
+}
+
 export interface StoryResult {
   title: string
   content: string
   vocabulary: { word: string; translation: string }[]
-  vocabularyMap: Record<string, string> // Pełny słowniczek: słowo -> tłumaczenie
+  vocabularyMap: Record<string, VocabularyEntry> // Pełny słowniczek z analizą
 }
 
 export async function generateStory(
@@ -90,17 +99,31 @@ Odpowiedz w formacie JSON:
     {"word": "słowo2", "translation": "tłumaczenie2"}
   ],
   "vocabularyMap": {
-    "słowo1": "tłumaczenie1",
-    "słowo2": "tłumaczenie2",
-    "słowo3": "tłumaczenie3"
+    "went": {
+      "translation": "poszedł/poszła",
+      "partOfSpeech": "verb",
+      "infinitive": "go",
+      "infinitiveTranslation": "iść",
+      "tenseInfo": "czas przeszły prosty (past simple)"
+    },
+    "beautiful": {
+      "translation": "piękny",
+      "partOfSpeech": "adjective"
+    },
+    "house": {
+      "translation": "dom",
+      "partOfSpeech": "noun"
+    }
   }
 }
 
 WAŻNE - vocabularyMap:
 - Musi zawierać WSZYSTKIE unikalne słowa z historii (rzeczowniki, czasowniki, przymiotniki, przysłówki)
 - Pomijaj tylko przyimki, rodzajniki i spójniki
-- Klucze powinny być w formie podstawowej/słownikowej (bezokolicznik dla czasowników, mianownik dla rzeczowników)
-- Jeśli w tekście jest odmieniona forma (np. "went"), dodaj zarówno "went": "poszedł/poszła", jak i "go": "iść"
+- Klucze to DOKŁADNIE formy z tekstu (np. "went", "houses", "running")
+- Dla KAŻDEGO czasownika odmienionego: dodaj infinitive, infinitiveTranslation i tenseInfo
+- partOfSpeech: "verb", "noun", "adjective", "adverb"
+- tenseInfo dla czasowników np.: "czas przeszły prosty", "czas teraźniejszy ciągły", "czas przyszły", "tryb warunkowy"
 
 Vocabulary (lista) powinno zawierać 10-15 najważniejszych/najtrudniejszych słów z historii.
 
@@ -119,12 +142,27 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
   // Upewnij się że vocabularyMap istnieje
   if (!parsed.vocabularyMap) {
     parsed.vocabularyMap = {}
-    // Fallback - użyj vocabulary array
+    // Fallback - użyj vocabulary array z podstawowym formatem
     if (parsed.vocabulary) {
       for (const item of parsed.vocabulary) {
-        parsed.vocabularyMap[item.word.toLowerCase()] = item.translation
+        parsed.vocabularyMap[item.word.toLowerCase()] = {
+          translation: item.translation,
+          partOfSpeech: 'unknown'
+        }
       }
     }
+  } else {
+    // Normalizuj klucze do lowercase
+    const normalizedMap: Record<string, VocabularyEntry> = {}
+    for (const [key, value] of Object.entries(parsed.vocabularyMap)) {
+      // Obsłuż stary format (string) i nowy format (object)
+      if (typeof value === 'string') {
+        normalizedMap[key.toLowerCase()] = { translation: value }
+      } else {
+        normalizedMap[key.toLowerCase()] = value as VocabularyEntry
+      }
+    }
+    parsed.vocabularyMap = normalizedMap
   }
 
   return parsed
