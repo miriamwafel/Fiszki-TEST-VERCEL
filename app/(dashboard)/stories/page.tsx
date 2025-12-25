@@ -7,6 +7,58 @@ import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
 
+// Loading messages for AI generation
+const storyLoadingMessages = [
+  'AI pisze historię dla Ciebie...',
+  'Tworzymy angażującą fabułę...',
+  'Dobieramy słownictwo do poziomu...',
+  'Generujemy spersonalizowaną treść...',
+]
+
+const wordLoadingMessages = [
+  'AI analizuje słowo...',
+  'Sprawdzamy kontekst zdania...',
+  'Rozpoznajemy formę gramatyczną...',
+]
+
+function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGenerating: boolean }) {
+  const [currentMessage, setCurrentMessage] = useState(messages[0])
+  const [dots, setDots] = useState('')
+
+  useEffect(() => {
+    if (!isGenerating) return
+
+    const messageInterval = setInterval(() => {
+      setCurrentMessage(messages[Math.floor(Math.random() * messages.length)])
+    }, 2500)
+
+    const dotsInterval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '' : prev + '.')
+    }, 500)
+
+    return () => {
+      clearInterval(messageInterval)
+      clearInterval(dotsInterval)
+    }
+  }, [isGenerating, messages])
+
+  if (!isGenerating) return null
+
+  return (
+    <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-lg">
+      <div className="relative mb-4">
+        <div className="w-12 h-12 border-4 border-primary-200 rounded-full animate-spin border-t-primary-600" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+      </div>
+      <p className="text-gray-600 font-medium">{currentMessage}{dots}</p>
+    </div>
+  )
+}
+
 interface Story {
   id: string
   title: string
@@ -52,9 +104,24 @@ export default function StoriesPage() {
   const [difficulty, setDifficulty] = useState('A2')
   const [wordCount, setWordCount] = useState('100')
 
-  const [wordModal, setWordModal] = useState<{ word: string; translation: string } | null>(null)
+  const [wordModal, setWordModal] = useState<{
+    word: string
+    translation: string
+    partOfSpeech?: string
+    context?: string
+    infinitive?: string
+    infinitiveTranslation?: string
+    tenseInfo?: string
+    suggestInfinitive?: boolean
+    phrase?: string
+    phraseTranslation?: string
+  } | null>(null)
   const [selectedSet, setSelectedSet] = useState('')
   const [addingToSet, setAddingToSet] = useState(false)
+  const [storyToDelete, setStoryToDelete] = useState<string | null>(null)
+  const [deletingStory, setDeletingStory] = useState(false)
+  const [translatingWord, setTranslatingWord] = useState(false)
+  const [topic, setTopic] = useState('')
 
   useEffect(() => {
     fetchStories()
@@ -93,6 +160,7 @@ export default function StoriesPage() {
           language,
           difficulty,
           wordCount: parseInt(wordCount),
+          topic: topic.trim() || undefined,
         }),
       })
 
@@ -112,11 +180,28 @@ export default function StoriesPage() {
     }
   }
 
+  const getSentenceContext = (content: string, word: string): string => {
+    // Find the sentence containing the word
+    const sentences = content.split(/(?<=[.!?])\s+/)
+    for (const sentence of sentences) {
+      if (sentence.toLowerCase().includes(word.toLowerCase())) {
+        return sentence.trim()
+      }
+    }
+    return ''
+  }
+
   const handleWordClick = async (word: string) => {
     // Clean the word from punctuation
     const cleanWord = word.replace(/[.,!?;:"'()[\]{}]/g, '').trim()
     if (!cleanWord) return
 
+    // Get sentence context from the story
+    const sentenceContext = selectedStory
+      ? getSentenceContext(selectedStory.content, cleanWord)
+      : ''
+
+    setTranslatingWord(true)
     try {
       const response = await fetch('/api/translate-word', {
         method: 'POST',
@@ -124,6 +209,7 @@ export default function StoriesPage() {
         body: JSON.stringify({
           word: cleanWord,
           fromLanguage: selectedStory?.language || language,
+          sentenceContext,
         }),
       })
 
@@ -133,25 +219,59 @@ export default function StoriesPage() {
         throw new Error(data.error)
       }
 
-      setWordModal({ word: cleanWord, translation: data.translation })
+      setWordModal({
+        word: cleanWord,
+        translation: data.translation,
+        partOfSpeech: data.partOfSpeech,
+        context: data.context,
+        infinitive: data.infinitive,
+        infinitiveTranslation: data.infinitiveTranslation,
+        tenseInfo: data.tenseInfo,
+        suggestInfinitive: data.suggestInfinitive,
+        phrase: data.phrase,
+        phraseTranslation: data.phraseTranslation,
+      })
     } catch (error) {
       console.error('Failed to translate word:', error)
       alert('Nie udało się przetłumaczyć słowa')
+    } finally {
+      setTranslatingWord(false)
     }
   }
 
-  const handleAddToSet = async () => {
+  const handleAddToSet = async (mode: 'word' | 'infinitive' | 'phrase' = 'word') => {
     if (!selectedSet || !wordModal) return
 
     setAddingToSet(true)
     try {
+      let wordToAdd: string
+      let translationToAdd: string
+      let contextToAdd: string | undefined
+
+      if (mode === 'infinitive' && wordModal.infinitive) {
+        wordToAdd = wordModal.infinitive
+        translationToAdd = wordModal.infinitiveTranslation || wordModal.translation
+        contextToAdd = 'Bezokolicznik'
+      } else if (mode === 'phrase' && wordModal.phrase) {
+        wordToAdd = wordModal.phrase
+        translationToAdd = wordModal.phraseTranslation || ''
+        contextToAdd = 'Fraza/wyrażenie'
+      } else {
+        wordToAdd = wordModal.word
+        translationToAdd = wordModal.translation
+        contextToAdd = wordModal.context
+      }
+
       const response = await fetch('/api/flashcards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           setId: selectedSet,
-          word: wordModal.word,
-          translation: wordModal.translation,
+          word: wordToAdd,
+          translation: translationToAdd,
+          context: contextToAdd,
+          partOfSpeech: mode === 'phrase' ? 'phrase' : wordModal.partOfSpeech,
+          infinitive: mode === 'word' ? wordModal.infinitive : null,
         }),
       })
 
@@ -159,13 +279,36 @@ export default function StoriesPage() {
         throw new Error('Failed to add flashcard')
       }
 
-      alert('Dodano do zestawu!')
       setWordModal(null)
     } catch (error) {
       console.error('Failed to add flashcard:', error)
       alert('Nie udało się dodać fiszki')
     } finally {
       setAddingToSet(false)
+    }
+  }
+
+  const handleDeleteStory = async (id: string) => {
+    setDeletingStory(true)
+    try {
+      const response = await fetch(`/api/stories/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete story')
+      }
+
+      setStories((prev) => prev.filter((s) => s.id !== id))
+      if (selectedStory?.id === id) {
+        setSelectedStory(null)
+      }
+      setStoryToDelete(null)
+    } catch (error) {
+      console.error('Failed to delete story:', error)
+      alert('Nie udało się usunąć historii')
+    } finally {
+      setDeletingStory(false)
     }
   }
 
@@ -225,6 +368,14 @@ export default function StoriesPage() {
               max="500"
             />
 
+            <Input
+              id="topic"
+              label="Temat (opcjonalnie)"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="np. podróże, jedzenie, praca..."
+            />
+
             <Button
               onClick={handleGenerate}
               loading={generating}
@@ -245,22 +396,48 @@ export default function StoriesPage() {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {stories.map((story) => (
-                  <button
+                  <div
                     key={story.id}
-                    onClick={() => setSelectedStory(story)}
-                    className={`w-full text-left p-3 rounded-lg text-sm transition-colors ${
+                    className={`relative group p-3 rounded-lg text-sm transition-colors ${
                       selectedStory?.id === story.id
                         ? 'bg-primary-50 border border-primary-200'
                         : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
-                    <p className="font-medium text-gray-900 truncate">
-                      {story.title}
-                    </p>
-                    <p className="text-gray-500 text-xs mt-1">
-                      {story.difficulty} · {story.wordCount} słów
-                    </p>
-                  </button>
+                    <button
+                      onClick={() => setSelectedStory(story)}
+                      className="w-full text-left"
+                    >
+                      <p className="font-medium text-gray-900 truncate pr-6">
+                        {story.title}
+                      </p>
+                      <p className="text-gray-500 text-xs mt-1">
+                        {story.difficulty} · {story.wordCount} słów
+                      </p>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setStoryToDelete(story.id)
+                      }}
+                      className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Usuń historię"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -268,7 +445,9 @@ export default function StoriesPage() {
         </Card>
 
         {/* Story display */}
-        <Card className="p-6 lg:col-span-2">
+        <Card className="p-6 lg:col-span-2 relative">
+          <AILoadingOverlay messages={storyLoadingMessages} isGenerating={generating} />
+          <AILoadingOverlay messages={wordLoadingMessages} isGenerating={translatingWord} />
           {selectedStory ? (
             <div>
               <div className="flex items-start justify-between mb-4">
@@ -357,8 +536,50 @@ export default function StoriesPage() {
               <p className="font-semibold text-gray-900 text-lg">
                 {wordModal.word}
               </p>
-              <p className="text-primary-600">{wordModal.translation}</p>
+              <p className="text-primary-600 text-lg">{wordModal.translation}</p>
+              {wordModal.partOfSpeech && (
+                <p className="text-sm text-gray-500 mt-1">
+                  ({wordModal.partOfSpeech})
+                </p>
+              )}
+              {wordModal.context && (
+                <p className="text-sm text-gray-600 mt-2 italic">
+                  {wordModal.context}
+                </p>
+              )}
             </div>
+
+            {/* Verb conjugation info */}
+            {wordModal.suggestInfinitive && wordModal.infinitive && wordModal.tenseInfo && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 font-medium mb-1">
+                  To odmieniona forma czasownika
+                </p>
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">Czas/forma:</span> {wordModal.tenseInfo}
+                </p>
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">Bezokolicznik:</span>{' '}
+                  <span className="font-semibold">{wordModal.infinitive}</span>
+                  {wordModal.infinitiveTranslation && (
+                    <span className="text-blue-600"> → {wordModal.infinitiveTranslation}</span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {/* Phrase info */}
+            {wordModal.phrase && wordModal.phraseTranslation && (
+              <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <p className="text-sm text-purple-800 font-medium mb-1">
+                  Wykryto wyrażenie/frazę
+                </p>
+                <p className="text-sm text-purple-700">
+                  <span className="font-semibold">{wordModal.phrase}</span>
+                  <span className="text-purple-600"> → {wordModal.phraseTranslation}</span>
+                </p>
+              </div>
+            )}
 
             {sets.length > 0 ? (
               <>
@@ -376,17 +597,41 @@ export default function StoriesPage() {
                   ]}
                 />
 
-                <div className="mt-4 flex gap-3 justify-end">
-                  <Button variant="secondary" onClick={() => setWordModal(null)}>
-                    Anuluj
-                  </Button>
-                  <Button
-                    onClick={handleAddToSet}
-                    disabled={!selectedSet}
-                    loading={addingToSet}
-                  >
-                    Dodaj do zestawu
-                  </Button>
+                <div className="mt-4 flex flex-col gap-2">
+                  {wordModal.phrase && wordModal.phraseTranslation && (
+                    <Button
+                      onClick={() => handleAddToSet('phrase')}
+                      disabled={!selectedSet}
+                      loading={addingToSet}
+                      className="w-full"
+                    >
+                      Dodaj frazę "{wordModal.phrase}"
+                    </Button>
+                  )}
+                  {wordModal.suggestInfinitive && wordModal.infinitive && (
+                    <Button
+                      onClick={() => handleAddToSet('infinitive')}
+                      disabled={!selectedSet}
+                      loading={addingToSet}
+                      className="w-full"
+                      variant={wordModal.phrase ? 'secondary' : 'primary'}
+                    >
+                      Dodaj bezokolicznik ({wordModal.infinitive})
+                    </Button>
+                  )}
+                  <div className="flex gap-3 justify-end">
+                    <Button variant="secondary" onClick={() => setWordModal(null)}>
+                      Anuluj
+                    </Button>
+                    <Button
+                      onClick={() => handleAddToSet('word')}
+                      disabled={!selectedSet}
+                      loading={addingToSet}
+                      variant={(wordModal.suggestInfinitive || wordModal.phrase) ? 'secondary' : 'primary'}
+                    >
+                      Dodaj "{wordModal.word}"
+                    </Button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -396,6 +641,29 @@ export default function StoriesPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Delete story modal */}
+      <Modal
+        isOpen={!!storyToDelete}
+        onClose={() => setStoryToDelete(null)}
+        title="Usuń historię"
+      >
+        <p className="text-gray-600 mb-4">
+          Czy na pewno chcesz usunąć tę historię? Ta operacja jest nieodwracalna.
+        </p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="secondary" onClick={() => setStoryToDelete(null)}>
+            Anuluj
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => storyToDelete && handleDeleteStory(storyToDelete)}
+            loading={deletingStory}
+          >
+            Usuń
+          </Button>
+        </div>
       </Modal>
     </div>
   )

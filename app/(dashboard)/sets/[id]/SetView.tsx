@@ -1,12 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
+
+const translationMessages = [
+  'AI analizuje słowo...',
+  'Szukamy najlepszego tłumaczenia...',
+  'Sprawdzamy kontekst użycia...',
+]
+
+function TranslationLoader({ isLoading }: { isLoading: boolean }) {
+  const [message, setMessage] = useState(translationMessages[0])
+  const [dots, setDots] = useState('')
+
+  useEffect(() => {
+    if (!isLoading) return
+
+    const msgInterval = setInterval(() => {
+      setMessage(translationMessages[Math.floor(Math.random() * translationMessages.length)])
+    }, 2000)
+
+    const dotsInterval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '' : prev + '.')
+    }, 500)
+
+    return () => {
+      clearInterval(msgInterval)
+      clearInterval(dotsInterval)
+    }
+  }, [isLoading])
+
+  if (!isLoading) return null
+
+  return (
+    <div className="mt-4 p-4 bg-primary-50 rounded-lg flex items-center gap-3">
+      <div className="w-5 h-5 border-2 border-primary-200 rounded-full animate-spin border-t-primary-600" />
+      <span className="text-primary-700">{message}{dots}</span>
+    </div>
+  )
+}
 
 interface Flashcard {
   id: string
@@ -45,6 +82,14 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [flashcardToDelete, setFlashcardToDelete] = useState<string | null>(null)
+  const [flashcardToEdit, setFlashcardToEdit] = useState<Flashcard | null>(null)
+  const [editForm, setEditForm] = useState({
+    word: '',
+    translation: '',
+    context: '',
+    partOfSpeech: '',
+  })
+  const [editLoading, setEditLoading] = useState(false)
 
   const handleTranslate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -156,6 +201,53 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
     }
   }
 
+  const startEditFlashcard = (flashcard: Flashcard) => {
+    setFlashcardToEdit(flashcard)
+    setEditForm({
+      word: flashcard.word,
+      translation: flashcard.translation,
+      context: flashcard.context || '',
+      partOfSpeech: flashcard.partOfSpeech || '',
+    })
+  }
+
+  const handleEditFlashcard = async () => {
+    if (!flashcardToEdit) return
+
+    setEditLoading(true)
+    try {
+      const response = await fetch(`/api/flashcards/${flashcardToEdit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          word: editForm.word.trim(),
+          translation: editForm.translation.trim(),
+          context: editForm.context.trim() || null,
+          partOfSpeech: editForm.partOfSpeech.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update flashcard')
+      }
+
+      const updatedFlashcard = await response.json()
+
+      setSet((prev) => ({
+        ...prev,
+        flashcards: prev.flashcards.map((f) =>
+          f.id === flashcardToEdit.id ? updatedFlashcard : f
+        ),
+      }))
+      setFlashcardToEdit(null)
+    } catch (error) {
+      console.error('Edit flashcard error:', error)
+      alert('Wystąpił błąd podczas edycji fiszki')
+    } finally {
+      setEditLoading(false)
+    }
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -247,6 +339,8 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
             Przetłumacz
           </Button>
         </form>
+
+        <TranslationLoader isLoading={loading} />
 
         {translationResult && (
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -373,24 +467,46 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                       </p>
                     )}
                   </div>
-                  <button
-                    onClick={() => setFlashcardToDelete(flashcard.id)}
-                    className="text-gray-400 hover:text-red-500 ml-2"
-                  >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                  <div className="flex gap-1 ml-2">
+                    <button
+                      onClick={() => startEditFlashcard(flashcard)}
+                      className="text-gray-400 hover:text-primary-600 p-1"
+                      title="Edytuj"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M6 18L18 6M6 6l12 12"
-                      />
-                    </svg>
-                  </button>
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={() => setFlashcardToDelete(flashcard.id)}
+                      className="text-gray-400 hover:text-red-500 p-1"
+                      title="Usuń"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -444,6 +560,52 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
           >
             Usuń
           </Button>
+        </div>
+      </Modal>
+
+      {/* Edit flashcard modal */}
+      <Modal
+        isOpen={!!flashcardToEdit}
+        onClose={() => setFlashcardToEdit(null)}
+        title="Edytuj fiszkę"
+      >
+        <div className="space-y-4">
+          <Input
+            id="edit-word"
+            label="Słowo"
+            value={editForm.word}
+            onChange={(e) => setEditForm({ ...editForm, word: e.target.value })}
+          />
+          <Input
+            id="edit-translation"
+            label="Tłumaczenie"
+            value={editForm.translation}
+            onChange={(e) => setEditForm({ ...editForm, translation: e.target.value })}
+          />
+          <Input
+            id="edit-context"
+            label="Kontekst (opcjonalnie)"
+            value={editForm.context}
+            onChange={(e) => setEditForm({ ...editForm, context: e.target.value })}
+          />
+          <Input
+            id="edit-partOfSpeech"
+            label="Część mowy (opcjonalnie)"
+            value={editForm.partOfSpeech}
+            onChange={(e) => setEditForm({ ...editForm, partOfSpeech: e.target.value })}
+          />
+          <div className="flex gap-3 justify-end mt-4">
+            <Button variant="secondary" onClick={() => setFlashcardToEdit(null)}>
+              Anuluj
+            </Button>
+            <Button
+              onClick={handleEditFlashcard}
+              loading={editLoading}
+              disabled={!editForm.word.trim() || !editForm.translation.trim()}
+            >
+              Zapisz
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
