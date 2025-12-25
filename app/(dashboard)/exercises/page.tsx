@@ -94,7 +94,7 @@ function LoadingSpinner({ message }: { message: string }) {
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="text-sm text-gray-500 mb-1">{progress}%</p>
+      <p className="text-sm text-gray-500 mb-1">{Math.round(progress)}%</p>
       <p className="text-sm text-gray-400">To może potrwać kilka sekund</p>
     </div>
   )

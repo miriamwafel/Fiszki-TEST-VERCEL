@@ -76,7 +76,7 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
           style={{ width: `${progress}%` }}
         />
       </div>
-      <p className="text-sm text-gray-500 mt-2">{progress}%</p>
+      <p className="text-sm text-gray-500 mt-2">{Math.round(progress)}%</p>
     </div>
   )
 }
