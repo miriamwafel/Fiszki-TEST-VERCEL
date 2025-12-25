@@ -105,30 +105,48 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
         // Obsłuż dane binarne (audio) - Blob
         if (event.data instanceof Blob) {
           const arrayBuffer = await event.data.arrayBuffer()
+          const text = new TextDecoder().decode(arrayBuffer)
 
-          // Jeśli mały blob - może to być tekst/błąd, spróbuj zdekodować
-          if (arrayBuffer.byteLength < 1000) {
-            const text = new TextDecoder().decode(arrayBuffer)
-            console.log('Received small blob as text:', text)
+          // Zawsze próbuj sparsować jako JSON (Gemini wysyła wszystko jako JSON)
+          try {
+            const jsonData = JSON.parse(text)
+            console.log('Received JSON from blob:', jsonData)
 
-            // Spróbuj sparsować jako JSON
-            try {
-              const jsonData = JSON.parse(text)
-              if (jsonData.setupComplete) {
-                console.log('Setup complete (from blob)!')
-                setupCompleteRef.current = true
-                setConnectionState('connected')
-                return
-              }
-            } catch {
-              // Nie jest JSON - może być audio
+            if (jsonData.setupComplete) {
+              console.log('Setup complete!')
+              setupCompleteRef.current = true
+              setConnectionState('connected')
+              return
             }
-          }
 
-          console.log('Received audio blob:', arrayBuffer.byteLength, 'bytes')
-          setIsModelSpeaking(true)
-          setAudioQueue(prev => [...prev, arrayBuffer])
-          return
+            // Obsłuż audio z JSON
+            if (jsonData.serverContent?.modelTurn?.parts) {
+              for (const part of jsonData.serverContent.modelTurn.parts) {
+                if (part.inlineData?.mimeType?.startsWith('audio/')) {
+                  setIsModelSpeaking(true)
+                  const audioBuffer = base64ToArrayBuffer(part.inlineData.data)
+                  console.log('Received audio from JSON:', audioBuffer.byteLength, 'bytes')
+                  setAudioQueue(prev => [...prev, audioBuffer])
+                }
+                if (part.text) {
+                  setCurrentText(prev => prev + part.text)
+                }
+              }
+            }
+
+            if (jsonData.serverContent?.turnComplete) {
+              console.log('Turn complete')
+              setIsModelSpeaking(false)
+            }
+
+            return
+          } catch {
+            // Nie jest JSON - traktuj jako surowe audio
+            console.log('Received raw audio blob:', arrayBuffer.byteLength, 'bytes')
+            setIsModelSpeaking(true)
+            setAudioQueue(prev => [...prev, arrayBuffer])
+            return
+          }
         }
 
         // Obsłuż JSON

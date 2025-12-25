@@ -29,10 +29,28 @@ export function LiveAudioPlayer({
   // Odtwórz pojedynczy bufor audio
   const playBuffer = useCallback(
     async (buffer: ArrayBuffer): Promise<void> => {
+      // Pomiń zbyt małe bufory (prawdopodobnie kontrolne, nie audio)
+      if (buffer.byteLength < 100) {
+        console.log('Skipping small buffer:', buffer.byteLength, 'bytes')
+        return
+      }
+
+      // Upewnij się, że długość jest parzysta dla Int16Array
+      let audioBuffer = buffer
+      if (buffer.byteLength % 2 !== 0) {
+        // Przytnij do parzystej długości
+        audioBuffer = buffer.slice(0, buffer.byteLength - 1)
+        console.log('Trimmed buffer from', buffer.byteLength, 'to', audioBuffer.byteLength)
+      }
+
+      if (audioBuffer.byteLength === 0) {
+        return
+      }
+
       const audioContext = getAudioContext()
 
       // Konwertuj PCM 16-bit na Float32
-      const int16Array = new Int16Array(buffer)
+      const int16Array = new Int16Array(audioBuffer)
       const float32Array = new Float32Array(int16Array.length)
 
       for (let i = 0; i < int16Array.length; i++) {
@@ -40,16 +58,16 @@ export function LiveAudioPlayer({
       }
 
       // Utwórz AudioBuffer
-      const audioBuffer = audioContext.createBuffer(
+      const webAudioBuffer = audioContext.createBuffer(
         1, // mono
         float32Array.length,
         sampleRate
       )
-      audioBuffer.getChannelData(0).set(float32Array)
+      webAudioBuffer.getChannelData(0).set(float32Array)
 
       // Odtwórz
       const source = audioContext.createBufferSource()
-      source.buffer = audioBuffer
+      source.buffer = webAudioBuffer
       source.connect(audioContext.destination)
 
       return new Promise((resolve) => {
