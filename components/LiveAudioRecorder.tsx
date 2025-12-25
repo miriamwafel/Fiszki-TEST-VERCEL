@@ -147,6 +147,14 @@ export function LiveAudioRecorder({
     }
   }, [isActive, startRecording, stopRecording])
 
+  // Zatrzymaj nagrywanie gdy disabled=true (np. gdy AI mówi)
+  useEffect(() => {
+    if (disabled && isActive) {
+      stopRecording()
+    }
+  }, [disabled, isActive, stopRecording])
+
+  // Cleanup przy unmount
   useEffect(() => {
     return () => {
       stopRecording()
@@ -282,14 +290,21 @@ export function LiveAudioRecorder({
         </p>
       </div>
 
-      {isActive && (
+      {isActive && !disabled && (
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           {isMobile ? 'Mikrofon nasłuchuje...' : 'Mikrofon aktywny - mów swobodnie'}
         </div>
       )}
 
-      {isMobile && !isActive && (
+      {disabled && isActive && (
+        <div className="flex items-center gap-2 text-sm text-orange-600 bg-orange-50 px-3 py-2 rounded-lg">
+          <span className="w-2 h-2 bg-orange-500 rounded-full" />
+          AI mówi - mikrofon wstrzymany
+        </div>
+      )}
+
+      {isMobile && !isActive && !disabled && (
         <div className="text-center max-w-xs space-y-2">
           <p className="text-xs text-primary-600 font-medium bg-primary-50 px-3 py-2 rounded-lg">
             💡 Push-to-talk: Przytrzymuj przycisk kiedy mówisz, puść aby AI odpowiedziało

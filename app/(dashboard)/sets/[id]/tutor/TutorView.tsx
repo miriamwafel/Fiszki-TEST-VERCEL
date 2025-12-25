@@ -568,7 +568,7 @@ WAŻNE:
           onAudioData={handleAudioData}
           isActive={isConversationActive}
           onActiveChange={handleConversationChange}
-          disabled={connectionState !== 'connected'}
+          disabled={connectionState !== 'connected' || isModelSpeaking}
         />
       </Card>
 
