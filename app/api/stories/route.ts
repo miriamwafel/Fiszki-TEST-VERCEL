@@ -68,7 +68,7 @@ export async function POST(request: Request) {
         language,
         difficulty,
         wordCount,
-        vocabulary: storyResult.vocabularyMap, // Zapisz pełny słowniczek
+        vocabulary: storyResult.vocabularyMap as unknown as Record<string, unknown>, // Zapisz pełny słowniczek
         userId: session.user.id,
       },
     })
