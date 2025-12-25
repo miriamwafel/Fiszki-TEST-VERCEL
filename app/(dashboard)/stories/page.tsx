@@ -7,6 +7,58 @@ import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
 
+// Loading messages for AI generation
+const storyLoadingMessages = [
+  'AI pisze historię dla Ciebie...',
+  'Tworzymy angażującą fabułę...',
+  'Dobieramy słownictwo do poziomu...',
+  'Generujemy spersonalizowaną treść...',
+]
+
+const wordLoadingMessages = [
+  'AI analizuje słowo...',
+  'Sprawdzamy kontekst zdania...',
+  'Rozpoznajemy formę gramatyczną...',
+]
+
+function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGenerating: boolean }) {
+  const [currentMessage, setCurrentMessage] = useState(messages[0])
+  const [dots, setDots] = useState('')
+
+  useEffect(() => {
+    if (!isGenerating) return
+
+    const messageInterval = setInterval(() => {
+      setCurrentMessage(messages[Math.floor(Math.random() * messages.length)])
+    }, 2500)
+
+    const dotsInterval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '' : prev + '.')
+    }, 500)
+
+    return () => {
+      clearInterval(messageInterval)
+      clearInterval(dotsInterval)
+    }
+  }, [isGenerating, messages])
+
+  if (!isGenerating) return null
+
+  return (
+    <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-lg">
+      <div className="relative mb-4">
+        <div className="w-12 h-12 border-4 border-primary-200 rounded-full animate-spin border-t-primary-600" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+      </div>
+      <p className="text-gray-600 font-medium">{currentMessage}{dots}</p>
+    </div>
+  )
+}
+
 interface Story {
   id: string
   title: string
@@ -65,6 +117,7 @@ export default function StoriesPage() {
   const [addingToSet, setAddingToSet] = useState(false)
   const [storyToDelete, setStoryToDelete] = useState<string | null>(null)
   const [deletingStory, setDeletingStory] = useState(false)
+  const [translatingWord, setTranslatingWord] = useState(false)
 
   useEffect(() => {
     fetchStories()
@@ -143,6 +196,7 @@ export default function StoriesPage() {
       ? getSentenceContext(selectedStory.content, cleanWord)
       : ''
 
+    setTranslatingWord(true)
     try {
       const response = await fetch('/api/translate-word', {
         method: 'POST',
@@ -172,6 +226,8 @@ export default function StoriesPage() {
     } catch (error) {
       console.error('Failed to translate word:', error)
       alert('Nie udało się przetłumaczyć słowa')
+    } finally {
+      setTranslatingWord(false)
     }
   }
 
@@ -359,7 +415,9 @@ export default function StoriesPage() {
         </Card>
 
         {/* Story display */}
-        <Card className="p-6 lg:col-span-2">
+        <Card className="p-6 lg:col-span-2 relative">
+          <AILoadingOverlay messages={storyLoadingMessages} isGenerating={generating} />
+          <AILoadingOverlay messages={wordLoadingMessages} isGenerating={translatingWord} />
           {selectedStory ? (
             <div>
               <div className="flex items-start justify-between mb-4">

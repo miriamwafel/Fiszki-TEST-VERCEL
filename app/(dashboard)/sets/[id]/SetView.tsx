@@ -1,12 +1,49 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
+
+const translationMessages = [
+  'AI analizuje słowo...',
+  'Szukamy najlepszego tłumaczenia...',
+  'Sprawdzamy kontekst użycia...',
+]
+
+function TranslationLoader({ isLoading }: { isLoading: boolean }) {
+  const [message, setMessage] = useState(translationMessages[0])
+  const [dots, setDots] = useState('')
+
+  useEffect(() => {
+    if (!isLoading) return
+
+    const msgInterval = setInterval(() => {
+      setMessage(translationMessages[Math.floor(Math.random() * translationMessages.length)])
+    }, 2000)
+
+    const dotsInterval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '' : prev + '.')
+    }, 500)
+
+    return () => {
+      clearInterval(msgInterval)
+      clearInterval(dotsInterval)
+    }
+  }, [isLoading])
+
+  if (!isLoading) return null
+
+  return (
+    <div className="mt-4 p-4 bg-primary-50 rounded-lg flex items-center gap-3">
+      <div className="w-5 h-5 border-2 border-primary-200 rounded-full animate-spin border-t-primary-600" />
+      <span className="text-primary-700">{message}{dots}</span>
+    </div>
+  )
+}
 
 interface Flashcard {
   id: string
@@ -282,6 +319,8 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
             Przetłumacz
           </Button>
         </form>
+
+        <TranslationLoader isLoading={loading} />
 
         {translationResult && (
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
