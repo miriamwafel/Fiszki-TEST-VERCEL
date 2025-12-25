@@ -52,9 +52,19 @@ export default function StoriesPage() {
   const [difficulty, setDifficulty] = useState('A2')
   const [wordCount, setWordCount] = useState('100')
 
-  const [wordModal, setWordModal] = useState<{ word: string; translation: string } | null>(null)
+  const [wordModal, setWordModal] = useState<{
+    word: string
+    translation: string
+    partOfSpeech?: string
+    context?: string
+    infinitive?: string
+    tenseInfo?: string
+    suggestInfinitive?: boolean
+  } | null>(null)
   const [selectedSet, setSelectedSet] = useState('')
   const [addingToSet, setAddingToSet] = useState(false)
+  const [storyToDelete, setStoryToDelete] = useState<string | null>(null)
+  const [deletingStory, setDeletingStory] = useState(false)
 
   useEffect(() => {
     fetchStories()
@@ -112,10 +122,26 @@ export default function StoriesPage() {
     }
   }
 
+  const getSentenceContext = (content: string, word: string): string => {
+    // Find the sentence containing the word
+    const sentences = content.split(/(?<=[.!?])\s+/)
+    for (const sentence of sentences) {
+      if (sentence.toLowerCase().includes(word.toLowerCase())) {
+        return sentence.trim()
+      }
+    }
+    return ''
+  }
+
   const handleWordClick = async (word: string) => {
     // Clean the word from punctuation
     const cleanWord = word.replace(/[.,!?;:"'()[\]{}]/g, '').trim()
     if (!cleanWord) return
+
+    // Get sentence context from the story
+    const sentenceContext = selectedStory
+      ? getSentenceContext(selectedStory.content, cleanWord)
+      : ''
 
     try {
       const response = await fetch('/api/translate-word', {
@@ -124,6 +150,7 @@ export default function StoriesPage() {
         body: JSON.stringify({
           word: cleanWord,
           fromLanguage: selectedStory?.language || language,
+          sentenceContext,
         }),
       })
 
@@ -133,25 +160,40 @@ export default function StoriesPage() {
         throw new Error(data.error)
       }
 
-      setWordModal({ word: cleanWord, translation: data.translation })
+      setWordModal({
+        word: cleanWord,
+        translation: data.translation,
+        partOfSpeech: data.partOfSpeech,
+        context: data.context,
+        infinitive: data.infinitive,
+        tenseInfo: data.tenseInfo,
+        suggestInfinitive: data.suggestInfinitive,
+      })
     } catch (error) {
       console.error('Failed to translate word:', error)
       alert('Nie udało się przetłumaczyć słowa')
     }
   }
 
-  const handleAddToSet = async () => {
+  const handleAddToSet = async (useInfinitive = false) => {
     if (!selectedSet || !wordModal) return
 
     setAddingToSet(true)
     try {
+      const wordToAdd = useInfinitive && wordModal.infinitive
+        ? wordModal.infinitive
+        : wordModal.word
+
       const response = await fetch('/api/flashcards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           setId: selectedSet,
-          word: wordModal.word,
+          word: wordToAdd,
           translation: wordModal.translation,
+          context: useInfinitive ? 'Bezokolicznik' : wordModal.context,
+          partOfSpeech: wordModal.partOfSpeech,
+          infinitive: wordModal.infinitive,
         }),
       })
 
@@ -159,13 +201,36 @@ export default function StoriesPage() {
         throw new Error('Failed to add flashcard')
       }
 
-      alert('Dodano do zestawu!')
       setWordModal(null)
     } catch (error) {
       console.error('Failed to add flashcard:', error)
       alert('Nie udało się dodać fiszki')
     } finally {
       setAddingToSet(false)
+    }
+  }
+
+  const handleDeleteStory = async (id: string) => {
+    setDeletingStory(true)
+    try {
+      const response = await fetch(`/api/stories/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete story')
+      }
+
+      setStories((prev) => prev.filter((s) => s.id !== id))
+      if (selectedStory?.id === id) {
+        setSelectedStory(null)
+      }
+      setStoryToDelete(null)
+    } catch (error) {
+      console.error('Failed to delete story:', error)
+      alert('Nie udało się usunąć historii')
+    } finally {
+      setDeletingStory(false)
     }
   }
 
@@ -245,22 +310,48 @@ export default function StoriesPage() {
             ) : (
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {stories.map((story) => (
-                  <button
+                  <div
                     key={story.id}
-                    onClick={() => setSelectedStory(story)}
-                    className={`w-full text-left p-3 rounded-lg text-sm transition-colors ${
+                    className={`relative group p-3 rounded-lg text-sm transition-colors ${
                       selectedStory?.id === story.id
                         ? 'bg-primary-50 border border-primary-200'
                         : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
-                    <p className="font-medium text-gray-900 truncate">
-                      {story.title}
-                    </p>
-                    <p className="text-gray-500 text-xs mt-1">
-                      {story.difficulty} · {story.wordCount} słów
-                    </p>
-                  </button>
+                    <button
+                      onClick={() => setSelectedStory(story)}
+                      className="w-full text-left"
+                    >
+                      <p className="font-medium text-gray-900 truncate pr-6">
+                        {story.title}
+                      </p>
+                      <p className="text-gray-500 text-xs mt-1">
+                        {story.difficulty} · {story.wordCount} słów
+                      </p>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setStoryToDelete(story.id)
+                      }}
+                      className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Usuń historię"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -357,8 +448,34 @@ export default function StoriesPage() {
               <p className="font-semibold text-gray-900 text-lg">
                 {wordModal.word}
               </p>
-              <p className="text-primary-600">{wordModal.translation}</p>
+              <p className="text-primary-600 text-lg">{wordModal.translation}</p>
+              {wordModal.partOfSpeech && (
+                <p className="text-sm text-gray-500 mt-1">
+                  ({wordModal.partOfSpeech})
+                </p>
+              )}
+              {wordModal.context && (
+                <p className="text-sm text-gray-600 mt-2 italic">
+                  {wordModal.context}
+                </p>
+              )}
             </div>
+
+            {/* Verb conjugation info */}
+            {wordModal.suggestInfinitive && wordModal.infinitive && wordModal.tenseInfo && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800 font-medium mb-1">
+                  To odmieniona forma czasownika
+                </p>
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">Czas/forma:</span> {wordModal.tenseInfo}
+                </p>
+                <p className="text-sm text-blue-700">
+                  <span className="font-medium">Bezokolicznik:</span>{' '}
+                  <span className="font-semibold">{wordModal.infinitive}</span>
+                </p>
+              </div>
+            )}
 
             {sets.length > 0 ? (
               <>
@@ -376,17 +493,30 @@ export default function StoriesPage() {
                   ]}
                 />
 
-                <div className="mt-4 flex gap-3 justify-end">
-                  <Button variant="secondary" onClick={() => setWordModal(null)}>
-                    Anuluj
-                  </Button>
-                  <Button
-                    onClick={handleAddToSet}
-                    disabled={!selectedSet}
-                    loading={addingToSet}
-                  >
-                    Dodaj do zestawu
-                  </Button>
+                <div className="mt-4 flex flex-col gap-2">
+                  {wordModal.suggestInfinitive && wordModal.infinitive && (
+                    <Button
+                      onClick={() => handleAddToSet(true)}
+                      disabled={!selectedSet}
+                      loading={addingToSet}
+                      className="w-full"
+                    >
+                      Dodaj bezokolicznik ({wordModal.infinitive})
+                    </Button>
+                  )}
+                  <div className="flex gap-3 justify-end">
+                    <Button variant="secondary" onClick={() => setWordModal(null)}>
+                      Anuluj
+                    </Button>
+                    <Button
+                      onClick={() => handleAddToSet(false)}
+                      disabled={!selectedSet}
+                      loading={addingToSet}
+                      variant={wordModal.suggestInfinitive ? 'secondary' : 'primary'}
+                    >
+                      Dodaj "{wordModal.word}"
+                    </Button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -396,6 +526,29 @@ export default function StoriesPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Delete story modal */}
+      <Modal
+        isOpen={!!storyToDelete}
+        onClose={() => setStoryToDelete(null)}
+        title="Usuń historię"
+      >
+        <p className="text-gray-600 mb-4">
+          Czy na pewno chcesz usunąć tę historię? Ta operacja jest nieodwracalna.
+        </p>
+        <div className="flex gap-3 justify-end">
+          <Button variant="secondary" onClick={() => setStoryToDelete(null)}>
+            Anuluj
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => storyToDelete && handleDeleteStory(storyToDelete)}
+            loading={deletingStory}
+          >
+            Usuń
+          </Button>
+        </div>
       </Modal>
     </div>
   )
