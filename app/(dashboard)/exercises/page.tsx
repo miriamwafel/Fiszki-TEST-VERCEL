@@ -142,7 +142,7 @@ export default function ExercisesPage() {
     }
   }
 
-  // Generate all gap exercises at once
+  // Generate all gap exercises at once using batch API
   const generateGapExercises = async () => {
     if (flashcards.length === 0) return
 
@@ -150,40 +150,33 @@ export default function ExercisesPage() {
     setGapExercises([])
 
     const set = sets.find((s) => s.id === selectedSetId)
-    const exercises: GapExercise[] = []
 
     try {
-      // Generate exercises for all flashcards
-      for (const flashcard of flashcards) {
-        try {
-          const response = await fetch('/api/exercises/gap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              word: flashcard.word,
-              translation: flashcard.translation,
-              language: set?.language,
-            }),
-          })
+      const response = await fetch('/api/exercises/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flashcards: flashcards.map(f => ({ id: f.id, word: f.word, translation: f.translation })),
+          language: set?.language,
+          type: 'gap',
+        }),
+      })
 
-          if (response.ok) {
-            const data = await response.json()
-            exercises.push({
-              flashcardId: flashcard.id,
-              sentence: data.sentence,
-              word: data.word,
-              hint: data.hint,
-              answer: '',
-              checked: false,
-              correct: null,
-            })
-          }
-        } catch {
-          // Continue with other flashcards if one fails
-        }
+      if (response.ok) {
+        const data = await response.json()
+        const exercises: GapExercise[] = (data.exercises || []).map((ex: { flashcardId: string; sentence: string; word: string; hint: string }) => ({
+          flashcardId: ex.flashcardId,
+          sentence: ex.sentence,
+          word: ex.word,
+          hint: ex.hint,
+          answer: '',
+          checked: false,
+          correct: null,
+        }))
+        setGapExercises(exercises)
+      } else {
+        throw new Error('Failed to generate exercises')
       }
-
-      setGapExercises(exercises)
     } catch (error) {
       console.error('Failed to generate exercises:', error)
       alert('Wystąpił błąd podczas generowania ćwiczeń')
@@ -192,7 +185,7 @@ export default function ExercisesPage() {
     }
   }
 
-  // Generate sentence exercises
+  // Generate sentence exercises using batch API
   const generateSentenceExercises = async () => {
     if (flashcards.length === 0) return
 
@@ -201,42 +194,36 @@ export default function ExercisesPage() {
     setCurrentSentenceIndex(0)
 
     const set = sets.find((s) => s.id === selectedSetId)
-    const exercises: SentenceExercise[] = []
 
     try {
-      for (const flashcard of flashcards) {
-        try {
-          const response = await fetch('/api/exercises/sentence', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              word: flashcard.word,
-              translation: flashcard.translation,
-              language: set?.language,
-            }),
-          })
+      const response = await fetch('/api/exercises/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flashcards: flashcards.map(f => ({ id: f.id, word: f.word, translation: f.translation })),
+          language: set?.language,
+          type: 'sentence',
+        }),
+      })
 
-          if (response.ok) {
-            const data = await response.json()
-            exercises.push({
-              flashcardId: flashcard.id,
-              targetWord: data.targetWord,
-              translation: flashcard.translation,
-              contextWords: data.contextWords,
-              exampleSentence: data.exampleSentence,
-              hint: data.hint,
-              answer: '',
-              checked: false,
-              correct: null,
-              feedback: '',
-            })
-          }
-        } catch {
-          // Continue with other flashcards if one fails
-        }
+      if (response.ok) {
+        const data = await response.json()
+        const exercises: SentenceExercise[] = (data.exercises || []).map((ex: { flashcardId: string; targetWord: string; contextWords: string[]; exampleSentence: string; hint: string }, i: number) => ({
+          flashcardId: ex.flashcardId,
+          targetWord: ex.targetWord,
+          translation: flashcards[i]?.translation || '',
+          contextWords: ex.contextWords,
+          exampleSentence: ex.exampleSentence,
+          hint: ex.hint,
+          answer: '',
+          checked: false,
+          correct: null,
+          feedback: '',
+        }))
+        setSentenceExercises(exercises)
+      } else {
+        throw new Error('Failed to generate exercises')
       }
-
-      setSentenceExercises(exercises)
     } catch (error) {
       console.error('Failed to generate exercises:', error)
       alert('Wystąpił błąd podczas generowania ćwiczeń')

@@ -110,14 +110,18 @@ export default function StoriesPage() {
     partOfSpeech?: string
     context?: string
     infinitive?: string
+    infinitiveTranslation?: string
     tenseInfo?: string
     suggestInfinitive?: boolean
+    phrase?: string
+    phraseTranslation?: string
   } | null>(null)
   const [selectedSet, setSelectedSet] = useState('')
   const [addingToSet, setAddingToSet] = useState(false)
   const [storyToDelete, setStoryToDelete] = useState<string | null>(null)
   const [deletingStory, setDeletingStory] = useState(false)
   const [translatingWord, setTranslatingWord] = useState(false)
+  const [topic, setTopic] = useState('')
 
   useEffect(() => {
     fetchStories()
@@ -156,6 +160,7 @@ export default function StoriesPage() {
           language,
           difficulty,
           wordCount: parseInt(wordCount),
+          topic: topic.trim() || undefined,
         }),
       })
 
@@ -220,8 +225,11 @@ export default function StoriesPage() {
         partOfSpeech: data.partOfSpeech,
         context: data.context,
         infinitive: data.infinitive,
+        infinitiveTranslation: data.infinitiveTranslation,
         tenseInfo: data.tenseInfo,
         suggestInfinitive: data.suggestInfinitive,
+        phrase: data.phrase,
+        phraseTranslation: data.phraseTranslation,
       })
     } catch (error) {
       console.error('Failed to translate word:', error)
@@ -231,14 +239,28 @@ export default function StoriesPage() {
     }
   }
 
-  const handleAddToSet = async (useInfinitive = false) => {
+  const handleAddToSet = async (mode: 'word' | 'infinitive' | 'phrase' = 'word') => {
     if (!selectedSet || !wordModal) return
 
     setAddingToSet(true)
     try {
-      const wordToAdd = useInfinitive && wordModal.infinitive
-        ? wordModal.infinitive
-        : wordModal.word
+      let wordToAdd: string
+      let translationToAdd: string
+      let contextToAdd: string | undefined
+
+      if (mode === 'infinitive' && wordModal.infinitive) {
+        wordToAdd = wordModal.infinitive
+        translationToAdd = wordModal.infinitiveTranslation || wordModal.translation
+        contextToAdd = 'Bezokolicznik'
+      } else if (mode === 'phrase' && wordModal.phrase) {
+        wordToAdd = wordModal.phrase
+        translationToAdd = wordModal.phraseTranslation || ''
+        contextToAdd = 'Fraza/wyrażenie'
+      } else {
+        wordToAdd = wordModal.word
+        translationToAdd = wordModal.translation
+        contextToAdd = wordModal.context
+      }
 
       const response = await fetch('/api/flashcards', {
         method: 'POST',
@@ -246,10 +268,10 @@ export default function StoriesPage() {
         body: JSON.stringify({
           setId: selectedSet,
           word: wordToAdd,
-          translation: wordModal.translation,
-          context: useInfinitive ? 'Bezokolicznik' : wordModal.context,
-          partOfSpeech: wordModal.partOfSpeech,
-          infinitive: wordModal.infinitive,
+          translation: translationToAdd,
+          context: contextToAdd,
+          partOfSpeech: mode === 'phrase' ? 'phrase' : wordModal.partOfSpeech,
+          infinitive: mode === 'word' ? wordModal.infinitive : null,
         }),
       })
 
@@ -344,6 +366,14 @@ export default function StoriesPage() {
               onChange={(e) => setWordCount(e.target.value)}
               min="50"
               max="500"
+            />
+
+            <Input
+              id="topic"
+              label="Temat (opcjonalnie)"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="np. podróże, jedzenie, praca..."
             />
 
             <Button
@@ -531,6 +561,22 @@ export default function StoriesPage() {
                 <p className="text-sm text-blue-700">
                   <span className="font-medium">Bezokolicznik:</span>{' '}
                   <span className="font-semibold">{wordModal.infinitive}</span>
+                  {wordModal.infinitiveTranslation && (
+                    <span className="text-blue-600"> → {wordModal.infinitiveTranslation}</span>
+                  )}
+                </p>
+              </div>
+            )}
+
+            {/* Phrase info */}
+            {wordModal.phrase && wordModal.phraseTranslation && (
+              <div className="mb-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                <p className="text-sm text-purple-800 font-medium mb-1">
+                  Wykryto wyrażenie/frazę
+                </p>
+                <p className="text-sm text-purple-700">
+                  <span className="font-semibold">{wordModal.phrase}</span>
+                  <span className="text-purple-600"> → {wordModal.phraseTranslation}</span>
                 </p>
               </div>
             )}
@@ -552,12 +598,23 @@ export default function StoriesPage() {
                 />
 
                 <div className="mt-4 flex flex-col gap-2">
-                  {wordModal.suggestInfinitive && wordModal.infinitive && (
+                  {wordModal.phrase && wordModal.phraseTranslation && (
                     <Button
-                      onClick={() => handleAddToSet(true)}
+                      onClick={() => handleAddToSet('phrase')}
                       disabled={!selectedSet}
                       loading={addingToSet}
                       className="w-full"
+                    >
+                      Dodaj frazę "{wordModal.phrase}"
+                    </Button>
+                  )}
+                  {wordModal.suggestInfinitive && wordModal.infinitive && (
+                    <Button
+                      onClick={() => handleAddToSet('infinitive')}
+                      disabled={!selectedSet}
+                      loading={addingToSet}
+                      className="w-full"
+                      variant={wordModal.phrase ? 'secondary' : 'primary'}
                     >
                       Dodaj bezokolicznik ({wordModal.infinitive})
                     </Button>
@@ -567,10 +624,10 @@ export default function StoriesPage() {
                       Anuluj
                     </Button>
                     <Button
-                      onClick={() => handleAddToSet(false)}
+                      onClick={() => handleAddToSet('word')}
                       disabled={!selectedSet}
                       loading={addingToSet}
-                      variant={wordModal.suggestInfinitive ? 'secondary' : 'primary'}
+                      variant={(wordModal.suggestInfinitive || wordModal.phrase) ? 'secondary' : 'primary'}
                     >
                       Dodaj "{wordModal.word}"
                     </Button>
