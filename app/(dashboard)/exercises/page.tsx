@@ -54,12 +54,27 @@ const loadingMessages = [
 
 function LoadingSpinner({ message }: { message: string }) {
   const [dots, setDots] = useState('')
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const dotsInterval = setInterval(() => {
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
-    return () => clearInterval(interval)
+
+    // Symulowany postęp: szybki start, potem wolniejszy
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev // Zatrzymaj na 90% i czekaj na odpowiedź
+        if (prev < 30) return prev + 3 // Szybki start
+        if (prev < 60) return prev + 2 // Średnie tempo
+        return prev + 1 // Wolne tempo na końcu
+      })
+    }, 200)
+
+    return () => {
+      clearInterval(dotsInterval)
+      clearInterval(progressInterval)
+    }
   }, [])
 
   return (
@@ -72,8 +87,15 @@ function LoadingSpinner({ message }: { message: string }) {
           </svg>
         </div>
       </div>
-      <p className="text-lg text-gray-600 font-medium">{message}{dots}</p>
-      <p className="text-sm text-gray-400 mt-2">To może potrwać kilka sekund</p>
+      <p className="text-lg text-gray-600 font-medium mb-4">{message}{dots}</p>
+      <div className="w-80 bg-gray-200 rounded-full h-2.5 overflow-hidden mb-2">
+        <div
+          className="bg-primary-600 h-full transition-all duration-200 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <p className="text-sm text-gray-500 mb-1">{progress}%</p>
+      <p className="text-sm text-gray-400">To może potrwać kilka sekund</p>
     </div>
   )
 }

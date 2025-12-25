@@ -24,9 +24,13 @@ const wordLoadingMessages = [
 function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGenerating: boolean }) {
   const [currentMessage, setCurrentMessage] = useState(messages[0])
   const [dots, setDots] = useState('')
+  const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    if (!isGenerating) return
+    if (!isGenerating) {
+      setProgress(0)
+      return
+    }
 
     const messageInterval = setInterval(() => {
       setCurrentMessage(messages[Math.floor(Math.random() * messages.length)])
@@ -36,9 +40,20 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
+    // Symulowany postęp: szybki start, potem wolniejszy
+    const progressInterval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) return prev // Zatrzymaj na 90% i czekaj na odpowiedź
+        if (prev < 30) return prev + 3 // Szybki start
+        if (prev < 60) return prev + 2 // Średnie tempo
+        return prev + 1 // Wolne tempo na końcu
+      })
+    }, 200)
+
     return () => {
       clearInterval(messageInterval)
       clearInterval(dotsInterval)
+      clearInterval(progressInterval)
     }
   }, [isGenerating, messages])
 
@@ -54,7 +69,14 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
           </svg>
         </div>
       </div>
-      <p className="text-gray-600 font-medium">{currentMessage}{dots}</p>
+      <p className="text-gray-600 font-medium mb-3">{currentMessage}{dots}</p>
+      <div className="w-64 bg-gray-200 rounded-full h-2 overflow-hidden">
+        <div
+          className="bg-primary-600 h-full transition-all duration-200 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <p className="text-sm text-gray-500 mt-2">{progress}%</p>
     </div>
   )
 }
