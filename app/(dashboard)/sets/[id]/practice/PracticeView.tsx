@@ -77,6 +77,9 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     e?.preventDefault()
     if (showResult || !currentCard) return
 
+    // Don't submit empty answers - prevents accidental submission on Enter
+    if (!answer.trim()) return
+
     const normalizedAnswer = answer.trim().toLowerCase()
     const normalizedWord = currentCard.word.toLowerCase()
 
@@ -243,9 +246,6 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
           <p className="text-3xl font-bold text-gray-900">
             {currentCard.translation}
           </p>
-          {currentCard.context && (
-            <p className="text-gray-500 mt-2">{currentCard.context}</p>
-          )}
         </div>
 
         <form onSubmit={handleSubmit}>

@@ -58,7 +58,8 @@ export interface StoryResult {
 export async function generateStory(
   language: string,
   wordCount: number,
-  difficulty: string
+  difficulty: string,
+  topic?: string
 ): Promise<StoryResult> {
   const difficultyDescriptions: Record<string, string> = {
     'A1': 'bardzo prosty, podstawowe słownictwo, proste zdania',
@@ -69,13 +70,15 @@ export async function generateStory(
     'C2': 'poziom native, skomplikowane słownictwo i styl',
   }
 
+  const topicInstruction = topic ? `\n- Temat/motyw przewodni: ${topic}` : ''
+
   const prompt = `Napisz krótką historię/opowiadanie w języku ${language}.
 
 Wymagania:
 - Około ${wordCount} słów
 - Poziom trudności: ${difficulty} (${difficultyDescriptions[difficulty] || difficulty})
 - Historia powinna być interesująca i angażująca
-- Używaj różnorodnego słownictwa odpowiedniego do poziomu
+- Używaj różnorodnego słownictwa odpowiedniego do poziomu${topicInstruction}
 
 Odpowiedz w formacie JSON:
 {
@@ -135,6 +138,118 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
   }
 
   return JSON.parse(jsonMatch[0])
+}
+
+export interface BatchGapExercise {
+  flashcardId: string
+  sentence: string
+  word: string
+  hint: string
+}
+
+export async function generateBatchGapExercises(
+  flashcards: { id: string; word: string; translation: string }[],
+  language: string
+): Promise<BatchGapExercise[]> {
+  const wordsList = flashcards.map((f, i) => `${i + 1}. "${f.word}" (${f.translation})`).join('\n')
+
+  const prompt = `Stwórz ćwiczenia z lukami dla następujących słów w języku ${language}:
+
+${wordsList}
+
+Dla KAŻDEGO słowa z listy stwórz jedno ćwiczenie z luką.
+
+Odpowiedz w formacie JSON:
+{
+  "exercises": [
+    {
+      "index": 1,
+      "sentence": "Zdanie z _____ zamiast słowa do uzupełnienia",
+      "word": "słowo",
+      "hint": "podpowiedź po polsku"
+    }
+  ]
+}
+
+WAŻNE: Musisz stworzyć dokładnie ${flashcards.length} ćwiczeń - po jednym dla każdego słowa z listy. Każde zdanie powinno być naturalne i pomagać zrozumieć kontekst użycia słowa.
+
+Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
+
+  const result = await gemini.generateContent(prompt)
+  const response = result.response.text()
+
+  const jsonMatch = response.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Invalid response format from Gemini')
+  }
+
+  const parsed = JSON.parse(jsonMatch[0])
+  const exercises = parsed.exercises || []
+
+  // Map exercises back to flashcard IDs
+  return exercises.map((ex: { index: number; sentence: string; word: string; hint: string }, i: number) => ({
+    flashcardId: flashcards[ex.index ? ex.index - 1 : i]?.id || flashcards[i]?.id,
+    sentence: ex.sentence,
+    word: ex.word,
+    hint: ex.hint,
+  }))
+}
+
+export interface BatchSentenceExercise {
+  flashcardId: string
+  targetWord: string
+  contextWords: string[]
+  exampleSentence: string
+  hint: string
+}
+
+export async function generateBatchSentenceExercises(
+  flashcards: { id: string; word: string; translation: string }[],
+  language: string
+): Promise<BatchSentenceExercise[]> {
+  const wordsList = flashcards.map((f, i) => `${i + 1}. "${f.word}" (${f.translation})`).join('\n')
+
+  const prompt = `Stwórz ćwiczenia na układanie zdań dla następujących słów w języku ${language}:
+
+${wordsList}
+
+Dla KAŻDEGO słowa z listy stwórz ćwiczenie gdzie użytkownik musi ułożyć zdanie używając danego słowa i 3 słów kontekstowych.
+
+Odpowiedz w formacie JSON:
+{
+  "exercises": [
+    {
+      "index": 1,
+      "targetWord": "słowo główne",
+      "contextWords": ["słowo1", "słowo2", "słowo3"],
+      "exampleSentence": "Przykładowe poprawne zdanie",
+      "hint": "podpowiedź po polsku"
+    }
+  ]
+}
+
+WAŻNE: Musisz stworzyć dokładnie ${flashcards.length} ćwiczeń - po jednym dla każdego słowa z listy.
+
+Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
+
+  const result = await gemini.generateContent(prompt)
+  const response = result.response.text()
+
+  const jsonMatch = response.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Invalid response format from Gemini')
+  }
+
+  const parsed = JSON.parse(jsonMatch[0])
+  const exercises = parsed.exercises || []
+
+  return exercises.map((ex: { index: number; targetWord: string; contextWords: string[]; exampleSentence: string; hint: string }, i: number) => ({
+    flashcardId: flashcards[ex.index ? ex.index - 1 : i]?.id || flashcards[i]?.id,
+    targetWord: ex.targetWord,
+    contextWords: ex.contextWords,
+    exampleSentence: ex.exampleSentence,
+    hint: ex.hint,
+  }))
 }
 
 export interface SentenceExercise {

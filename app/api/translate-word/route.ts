@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { word, fromLanguage } = await request.json()
+    const { word, fromLanguage, sentenceContext } = await request.json()
 
     if (!word || !fromLanguage) {
       return NextResponse.json(
@@ -32,13 +32,70 @@ export async function POST(request: Request) {
 
     const languageName = languageNames[fromLanguage] || fromLanguage
 
-    const prompt = `Przetłumacz słowo "${word}" z języka ${languageName} na polski.
-Odpowiedz TYLKO tłumaczeniem, bez dodatkowych wyjaśnień.`
+    // Use advanced prompt with sentence context for verb detection and phrase detection
+    const prompt = sentenceContext
+      ? `Przetłumacz słowo "${word}" z języka ${languageName} na polski.
+Słowo występuje w kontekście zdania: "${sentenceContext}"
+
+Odpowiedz w formacie JSON:
+{
+  "word": "${word}",
+  "translation": "tłumaczenie po polsku (w formie jak w tekście)",
+  "partOfSpeech": "część mowy (verb, noun, adjective, adverb, etc.)",
+  "context": "krótki przykład użycia lub dodatkowe wyjaśnienie",
+  "infinitive": "jeśli to czasownik w formie odmienionej, podaj bezokolicznik w języku ${languageName}, w przeciwnym razie null",
+  "infinitiveTranslation": "jeśli to czasownik odmieniony, podaj tłumaczenie BEZOKOLICZNIKA po polsku (np. 'upuszczać', 'biegać'), w przeciwnym razie null",
+  "tenseInfo": "jeśli to odmieniony czasownik, opisz po polsku jaki to czas i forma (np. 'czas przeszły, 3 osoba liczby pojedynczej'), w przeciwnym razie null",
+  "suggestInfinitive": true/false - ustaw true jeśli słowo to odmieniony czasownik i warto dodać bezokolicznik jako osobną fiszkę,
+  "phrase": "jeśli słowo jest częścią idiomatycznego wyrażenia, kolokacji lub frazy w tym zdaniu, podaj całą frazę (np. 'take care of', 'make a decision'), w przeciwnym razie null",
+  "phraseTranslation": "jeśli jest fraza, podaj jej tłumaczenie na polski, w przeciwnym razie null"
+}
+
+Biorąc pod uwagę kontekst zdania:
+1. Określ czy słowo jest odmienioną formą czasownika - jeśli tak, podaj bezokolicznik i jego tłumaczenie w bezokoliczniku
+2. Sprawdź czy słowo jest częścią większego wyrażenia idiomatycznego lub kolokacji - jeśli tak, podaj całą frazę
+
+Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
+      : `Przetłumacz słowo "${word}" z języka ${languageName} na polski.
+Odpowiedz w formacie JSON:
+{
+  "word": "${word}",
+  "translation": "tłumaczenie po polsku",
+  "partOfSpeech": "część mowy (verb, noun, adjective, adverb, etc.)",
+  "context": null,
+  "infinitive": null,
+  "infinitiveTranslation": null,
+  "tenseInfo": null,
+  "suggestInfinitive": false,
+  "phrase": null,
+  "phraseTranslation": null
+}
+
+Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
 
     const result = await gemini.generateContent(prompt)
-    const translation = result.response.text().trim()
+    const response = result.response.text()
 
-    return NextResponse.json({ translation })
+    // Extract JSON from response
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      // Fallback to simple translation
+      return NextResponse.json({
+        word,
+        translation: response.trim(),
+        partOfSpeech: null,
+        context: null,
+        infinitive: null,
+        infinitiveTranslation: null,
+        tenseInfo: null,
+        suggestInfinitive: false,
+        phrase: null,
+        phraseTranslation: null
+      })
+    }
+
+    const parsed = JSON.parse(jsonMatch[0])
+    return NextResponse.json(parsed)
   } catch (error) {
     console.error('Translate word error:', error)
     return NextResponse.json(
