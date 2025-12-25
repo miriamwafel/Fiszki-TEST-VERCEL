@@ -559,20 +559,20 @@ export default function StoriesPage() {
                 </span>
               </div>
 
-              <div className="prose max-w-none mb-6">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {renderStoryContent(selectedStory.content)}
-                </p>
-              </div>
-
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800 mb-2 font-medium">
                   💡 Jak korzystać z historyjki:
                 </p>
                 <ul className="text-sm text-blue-700 space-y-1 list-disc list-inside">
-                  <li>Kliknij na dowolne słowo, aby sprawdzić jego znaczenie i dodać do zestawu fiszek</li>
-                  <li>Na dole znajdziesz słownik wyrazów i fraz z tej historii</li>
+                  <li>Kliknij na dowolne słowo w tekście, aby sprawdzić jego znaczenie i dodać do zestawu fiszek</li>
+                  <li>Na dole znajdziesz słownik wyrazów i fraz z tej historii - klikając w nie też możesz dodać je do zestawu</li>
                 </ul>
+              </div>
+
+              <div className="prose max-w-none mb-6">
+                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {renderStoryContent(selectedStory.content)}
+                </p>
               </div>
 
               <div className="mb-4">

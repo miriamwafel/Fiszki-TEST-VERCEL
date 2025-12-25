@@ -91,7 +91,14 @@ export function LiveAudioRecorder({
       }
 
       source.connect(scriptProcessor)
-      scriptProcessor.connect(audioContext.destination)
+
+      // Utwórz cichy GainNode jako "sink" - zapobiega pętli zwrotnej na mobile
+      // ScriptProcessorNode wymaga połączenia z destination aby działać,
+      // ale ustawiamy gain=0 żeby nie było słychać mikrofonu w głośnikach
+      const gainNode = audioContext.createGain()
+      gainNode.gain.value = 0 // Całkowicie wycisz
+      scriptProcessor.connect(gainNode)
+      gainNode.connect(audioContext.destination)
 
       onActiveChange(true)
       setPermissionDenied(false)

@@ -267,9 +267,9 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
           {set.flashcards.length > 0 && (
             <>
               <Link href={`/sets/${set.id}/practice`} className="flex-1 sm:flex-none">
-                <Button variant="secondary" className="w-full sm:w-auto text-sm">
+                <Button variant="secondary" className="w-full sm:w-auto text-xs sm:text-sm">
                   <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2"
+                    className="w-4 h-4 mr-1 sm:mr-2 flex-shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -281,14 +281,13 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                       d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Powtórka</span>
-                  <span className="sm:hidden">↻</span>
+                  Powtórka
                 </Button>
               </Link>
               <Link href="/exercises" className="flex-1 sm:flex-none">
-                <Button variant="secondary" className="w-full sm:w-auto text-sm">
+                <Button variant="secondary" className="w-full sm:w-auto text-xs sm:text-sm">
                   <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2"
+                    className="w-4 h-4 mr-1 sm:mr-2 flex-shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -300,14 +299,13 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                       d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Ćwiczenia</span>
-                  <span className="sm:hidden">✓</span>
+                  Ćwiczenia
                 </Button>
               </Link>
               <Link href={`/sets/${set.id}/tutor`} className="flex-1 sm:flex-none">
-                <Button className="w-full sm:w-auto text-sm">
+                <Button className="w-full sm:w-auto text-xs sm:text-sm">
                   <svg
-                    className="w-4 h-4 sm:w-5 sm:h-5 sm:mr-2"
+                    className="w-4 h-4 mr-1 sm:mr-2 flex-shrink-0"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -319,8 +317,7 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                       d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
                     />
                   </svg>
-                  <span className="hidden sm:inline">Rozmowa AI</span>
-                  <span className="sm:hidden">🎤</span>
+                  AI Tutor
                 </Button>
               </Link>
             </>
