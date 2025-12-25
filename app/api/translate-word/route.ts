@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { gemini } from '@/lib/gemini'
+import prisma from '@/lib/db'
 
 export async function POST(request: Request) {
   try {
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { word, fromLanguage, sentenceContext } = await request.json()
+    const { word, fromLanguage, sentenceContext, storyId } = await request.json()
 
     if (!word || !fromLanguage) {
       return NextResponse.json(
@@ -20,6 +21,41 @@ export async function POST(request: Request) {
       )
     }
 
+    // Sprawdź cache w historyjce jeśli podano storyId
+    if (storyId) {
+      const story = await prisma.story.findUnique({
+        where: { id: storyId },
+        select: { vocabulary: true }
+      })
+
+      if (story?.vocabulary) {
+        const vocab = story.vocabulary as Record<string, string>
+        const wordLower = word.toLowerCase()
+
+        // Sprawdź dopasowanie (z i bez znaków interpunkcyjnych)
+        const cleanWord = wordLower.replace(/[.,!?;:'"„"«»\-–—()[\]{}]/g, '')
+        const cachedTranslation = vocab[wordLower] || vocab[cleanWord] || vocab[word]
+
+        if (cachedTranslation) {
+          // Zwróć z cache - NATYCHMIASTOWA odpowiedź!
+          return NextResponse.json({
+            word,
+            translation: cachedTranslation,
+            partOfSpeech: null,
+            context: null,
+            infinitive: null,
+            infinitiveTranslation: null,
+            tenseInfo: null,
+            suggestInfinitive: false,
+            phrase: null,
+            phraseTranslation: null,
+            fromCache: true
+          })
+        }
+      }
+    }
+
+    // Jeśli nie ma w cache - użyj AI (ale to będzie rzadko)
     const languageNames: Record<string, string> = {
       en: 'angielskiego',
       de: 'niemieckiego',

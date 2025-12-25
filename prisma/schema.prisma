@@ -63,6 +63,7 @@ model Story {
   language    String
   difficulty  String   // A1, A2, B1, B2, C1, C2
   wordCount   Int
+  vocabulary  Json?    // Pre-generated słowniczek: { "word": "translation", ... }
   createdAt   DateTime @default(now())
 
   userId      String

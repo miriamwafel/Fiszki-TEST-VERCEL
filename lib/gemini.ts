@@ -53,6 +53,7 @@ export interface StoryResult {
   title: string
   content: string
   vocabulary: { word: string; translation: string }[]
+  vocabularyMap: Record<string, string> // Pełny słowniczek: słowo -> tłumaczenie
 }
 
 export async function generateStory(
@@ -87,10 +88,21 @@ Odpowiedz w formacie JSON:
   "vocabulary": [
     {"word": "słowo1", "translation": "tłumaczenie1"},
     {"word": "słowo2", "translation": "tłumaczenie2"}
-  ]
+  ],
+  "vocabularyMap": {
+    "słowo1": "tłumaczenie1",
+    "słowo2": "tłumaczenie2",
+    "słowo3": "tłumaczenie3"
+  }
 }
 
-Vocabulary powinno zawierać 10-15 najważniejszych/najtrudniejszych słów z historii z tłumaczeniami na polski.
+WAŻNE - vocabularyMap:
+- Musi zawierać WSZYSTKIE unikalne słowa z historii (rzeczowniki, czasowniki, przymiotniki, przysłówki)
+- Pomijaj tylko przyimki, rodzajniki i spójniki
+- Klucze powinny być w formie podstawowej/słownikowej (bezokolicznik dla czasowników, mianownik dla rzeczowników)
+- Jeśli w tekście jest odmieniona forma (np. "went"), dodaj zarówno "went": "poszedł/poszła", jak i "go": "iść"
+
+Vocabulary (lista) powinno zawierać 10-15 najważniejszych/najtrudniejszych słów z historii.
 
 Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
 
@@ -102,7 +114,20 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
     throw new Error('Invalid response format from Gemini')
   }
 
-  return JSON.parse(jsonMatch[0])
+  const parsed = JSON.parse(jsonMatch[0])
+
+  // Upewnij się że vocabularyMap istnieje
+  if (!parsed.vocabularyMap) {
+    parsed.vocabularyMap = {}
+    // Fallback - użyj vocabulary array
+    if (parsed.vocabulary) {
+      for (const item of parsed.vocabulary) {
+        parsed.vocabularyMap[item.word.toLowerCase()] = item.translation
+      }
+    }
+  }
+
+  return parsed
 }
 
 export interface GapExercise {

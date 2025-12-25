@@ -68,13 +68,14 @@ export async function POST(request: Request) {
         language,
         difficulty,
         wordCount,
+        vocabulary: storyResult.vocabularyMap, // Zapisz pełny słowniczek
         userId: session.user.id,
       },
     })
 
     return NextResponse.json({
       ...story,
-      vocabulary: storyResult.vocabulary,
+      vocabularyList: storyResult.vocabulary, // Lista 10-15 najważniejszych
     })
   } catch (error) {
     console.error('Create story error:', error)

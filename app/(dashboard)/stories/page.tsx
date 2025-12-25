@@ -210,6 +210,7 @@ export default function StoriesPage() {
           word: cleanWord,
           fromLanguage: selectedStory?.language || language,
           sentenceContext,
+          storyId: selectedStory?.id, // Przekaż storyId dla cache
         }),
       })
 
