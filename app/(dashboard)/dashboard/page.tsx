@@ -36,6 +36,62 @@ export default async function DashboardPage() {
         Witaj{session?.user.name ? `, ${session.user.name}` : ''}!
       </h1>
 
+      {/* Instrukcja korzystania z aplikacji */}
+      <Card className="p-6 mb-8 bg-gradient-to-r from-primary-50 to-purple-50 border-primary-200">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Jak korzystać z Fiszek?
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0 text-purple-600 font-bold">
+              1
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Twórz historyjki</p>
+              <p className="text-sm text-gray-600">
+                Generuj historyjki w wybranym języku. Klikaj na słowa aby poznać tłumaczenie i dodaj je do zestawu fiszek.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0 text-primary-600 font-bold">
+              2
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Buduj zestawy fiszek</p>
+              <p className="text-sm text-gray-600">
+                Dodawaj słówka z historyjek lub twórz własne fiszki bezpośrednio w zestawach.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 text-green-600 font-bold">
+              3
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Ćwicz i powtarzaj</p>
+              <p className="text-sm text-gray-600">
+                Powtarzaj fiszki w zestawach lub twórz ćwiczenia (luki, zdania) dopasowane do Twoich słówek.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0 text-yellow-600 font-bold">
+              4
+            </div>
+            <div>
+              <p className="font-medium text-gray-900">Rozmawiaj z AI</p>
+              <p className="text-sm text-gray-600">
+                Ćwicz konwersację z AI Tutorem - prowadź rozmowy głosowe na wybranym poziomie zaawansowania.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card className="p-6">
           <div className="flex items-center">
