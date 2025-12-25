@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ...story,
-      vocabularyList: storyResult.vocabulary, // Lista 10-15 najważniejszych
+      vocabulary: storyResult.vocabulary, // Lista 10-15 najważniejszych (frontend oczekuje 'vocabulary')
     })
   } catch (error) {
     console.error('Create story error:', error)
