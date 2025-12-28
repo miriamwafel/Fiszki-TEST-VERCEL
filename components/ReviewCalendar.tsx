@@ -17,6 +17,46 @@ interface ReviewItem {
   }
 }
 
+const languageNames: Record<string, string> = {
+  en: 'Angielski',
+  de: 'Niemiecki',
+  es: 'Hiszpański',
+  fr: 'Francuski',
+  it: 'Włoski',
+  pt: 'Portugalski',
+  ru: 'Rosyjski',
+  ja: 'Japoński',
+  ko: 'Koreański',
+  zh: 'Chiński',
+  nl: 'Holenderski',
+  sv: 'Szwedzki',
+  no: 'Norweski',
+  da: 'Duński',
+  fi: 'Fiński',
+  cs: 'Czeski',
+  uk: 'Ukraiński',
+}
+
+const languageFlags: Record<string, string> = {
+  en: '🇬🇧',
+  de: '🇩🇪',
+  es: '🇪🇸',
+  fr: '🇫🇷',
+  it: '🇮🇹',
+  pt: '🇵🇹',
+  ru: '🇷🇺',
+  ja: '🇯🇵',
+  ko: '🇰🇷',
+  zh: '🇨🇳',
+  nl: '🇳🇱',
+  sv: '🇸🇪',
+  no: '🇳🇴',
+  da: '🇩🇰',
+  fi: '🇫🇮',
+  cs: '🇨🇿',
+  uk: '🇺🇦',
+}
+
 export function ReviewCalendar() {
   const [reviews, setReviews] = useState<ReviewItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,6 +109,19 @@ export function ReviewCalendar() {
     return reviewDate < today && !r.completed
   })
 
+  // Grupuj powtórki po językach
+  const groupReviewsByLanguage = (reviewsToGroup: ReviewItem[]) => {
+    const byLanguage: Record<string, ReviewItem[]> = {}
+    for (const review of reviewsToGroup) {
+      const lang = review.set.language
+      if (!byLanguage[lang]) {
+        byLanguage[lang] = []
+      }
+      byLanguage[lang].push(review)
+    }
+    return byLanguage
+  }
+
   const formatDayName = (date: Date) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -115,6 +168,16 @@ export function ReviewCalendar() {
       </Card>
     )
   }
+
+  // Przygotuj dane do wyświetlenia
+  const displayReviews = selectedDate
+    ? reviewsByDate[selectedDate] || []
+    : [...overdueReviews, ...todaysReviews]
+
+  const reviewsByLanguage = groupReviewsByLanguage(displayReviews.filter(r => !r.completed))
+  const sortedLanguages = Object.keys(reviewsByLanguage).sort(
+    (a, b) => reviewsByLanguage[b].length - reviewsByLanguage[a].length
+  )
 
   return (
     <Card className="p-4">
@@ -174,82 +237,108 @@ export function ReviewCalendar() {
         })}
       </div>
 
-      {/* Lista powtórek na wybrany dzień lub dziś */}
-      <div className="space-y-2">
-        {/* Zaległe powtórki */}
-        {!selectedDate && overdueReviews.length > 0 && (
-          <div className="mb-3">
-            <h4 className="text-xs font-medium text-red-600 uppercase tracking-wider mb-2">
-              Zaległe powtórki
-            </h4>
-            {overdueReviews.map((review) => (
-              <Link
-                key={review.id}
-                href={`/sets/${review.set.id}`}
-                className="flex items-center justify-between p-3 bg-red-50 rounded-lg hover:bg-red-100 transition-colors mb-2"
-              >
-                <div>
-                  <p className="font-medium text-gray-900 text-sm">{review.set.name}</p>
-                  <p className="text-xs text-red-600">
-                    {new Date(review.scheduledDate).toLocaleDateString('pl-PL')} · {review.set._count.flashcards} fiszek
-                  </p>
-                </div>
-                <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">
-                  Zaległe
-                </span>
-              </Link>
-            ))}
-          </div>
+      {/* Lista powtórek pogrupowana po językach */}
+      <div className="space-y-4">
+        {sortedLanguages.length === 0 && !selectedDate && (
+          <p className="text-sm text-gray-500 text-center py-4">
+            Brak powtórek na dziś - świetna robota!
+          </p>
         )}
 
-        {/* Powtórki na wybrany dzień lub dziś */}
-        {(selectedDate ? reviewsByDate[selectedDate] : todaysReviews)?.map((review) => (
-          <Link
-            key={review.id}
-            href={`/sets/${review.set.id}`}
-            className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
-              review.completed
-                ? 'bg-gray-50 hover:bg-gray-100'
-                : 'bg-green-50 hover:bg-green-100'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {review.completed ? (
-                <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <div className="w-5 h-5 rounded-full border-2 border-green-400" />
-              )}
-              <div>
-                <p className={`font-medium text-sm ${review.completed ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
-                  {review.set.name}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {review.set._count.flashcards} fiszek · {review.set.language.toUpperCase()}
-                </p>
-              </div>
-            </div>
-            {!review.completed && (
-              <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded">
-                Do zrobienia
-              </span>
-            )}
-          </Link>
-        ))}
-
-        {/* Brak powtórek na wybrany dzień */}
-        {selectedDate && (!reviewsByDate[selectedDate] || reviewsByDate[selectedDate].length === 0) && (
+        {sortedLanguages.length === 0 && selectedDate && (
           <p className="text-sm text-gray-500 text-center py-4">
             Brak powtórek na ten dzień
           </p>
         )}
 
-        {/* Brak powtórek na dziś */}
-        {!selectedDate && todaysReviews.length === 0 && overdueReviews.length === 0 && (
-          <p className="text-sm text-gray-500 text-center py-4">
-            Brak powtórek na dziś - świetna robota!
-          </p>
+        {sortedLanguages.map((language) => (
+          <div key={language}>
+            {/* Nagłówek języka */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{languageFlags[language] || '🌍'}</span>
+              <span className="text-sm font-medium text-gray-700">
+                {languageNames[language] || language}
+              </span>
+              <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                {reviewsByLanguage[language].length}
+              </span>
+            </div>
+
+            {/* Powtórki dla tego języka */}
+            <div className="space-y-2 ml-7">
+              {reviewsByLanguage[language].map((review) => {
+                const reviewDate = new Date(review.scheduledDate)
+                reviewDate.setHours(0, 0, 0, 0)
+                const isOverdue = reviewDate < today
+
+                return (
+                  <Link
+                    key={review.id}
+                    href={`/sets/${review.set.id}`}
+                    className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
+                      isOverdue
+                        ? 'bg-red-50 hover:bg-red-100'
+                        : 'bg-green-50 hover:bg-green-100'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 ${
+                        isOverdue ? 'border-red-400' : 'border-green-400'
+                      }`} />
+                      <div>
+                        <p className="font-medium text-sm text-gray-900">
+                          {review.set.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {review.set._count.flashcards} fiszek
+                          {isOverdue && (
+                            <span className="text-red-600 ml-2">
+                              · {new Date(review.scheduledDate).toLocaleDateString('pl-PL')}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded ${
+                      isOverdue
+                        ? 'bg-red-200 text-red-800'
+                        : 'bg-green-200 text-green-800'
+                    }`}>
+                      {isOverdue ? 'Zaległe' : 'Do zrobienia'}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+
+        {/* Ukończone powtórki na wybrany dzień */}
+        {selectedDate && reviewsByDate[selectedDate]?.filter(r => r.completed).length > 0 && (
+          <div className="pt-2 border-t">
+            <p className="text-xs text-gray-500 mb-2">Ukończone</p>
+            {reviewsByDate[selectedDate].filter(r => r.completed).map((review) => (
+              <Link
+                key={review.id}
+                href={`/sets/${review.set.id}`}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors mb-2"
+              >
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <div>
+                    <p className="font-medium text-sm text-gray-500 line-through">
+                      {review.set.name}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {languageFlags[review.set.language]} {review.set._count.flashcards} fiszek
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
         )}
       </div>
     </Card>

@@ -25,6 +25,26 @@ const languageNames: Record<string, string> = {
   uk: 'Ukraiński',
 }
 
+const languageFlags: Record<string, string> = {
+  en: '🇬🇧',
+  de: '🇩🇪',
+  es: '🇪🇸',
+  fr: '🇫🇷',
+  it: '🇮🇹',
+  pt: '🇵🇹',
+  ru: '🇷🇺',
+  ja: '🇯🇵',
+  ko: '🇰🇷',
+  zh: '🇨🇳',
+  nl: '🇳🇱',
+  sv: '🇸🇪',
+  no: '🇳🇴',
+  da: '🇩🇰',
+  fi: '🇫🇮',
+  cs: '🇨🇿',
+  uk: '🇺🇦',
+}
+
 export default async function SetsPage() {
   const session = await getServerSession(authOptions)
 
@@ -37,6 +57,20 @@ export default async function SetsPage() {
     },
     orderBy: { updatedAt: 'desc' },
   })
+
+  // Grupuj zestawy po językach
+  const setsByLanguage: Record<string, typeof sets> = {}
+  for (const set of sets) {
+    if (!setsByLanguage[set.language]) {
+      setsByLanguage[set.language] = []
+    }
+    setsByLanguage[set.language].push(set)
+  }
+
+  // Sortuj języki - najpierw te z największą liczbą zestawów
+  const sortedLanguages = Object.keys(setsByLanguage).sort(
+    (a, b) => setsByLanguage[b].length - setsByLanguage[a].length
+  )
 
   return (
     <div>
@@ -90,35 +124,49 @@ export default async function SetsPage() {
           </Link>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sets.map((set) => (
-            <Link key={set.id} href={`/sets/${set.id}`}>
-              <Card variant="interactive" className="p-6 h-full">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 text-lg mb-1">
-                      {set.name}
-                    </h3>
-                    {set.description && (
-                      <p className="text-sm text-gray-500 line-clamp-2">
-                        {set.description}
-                      </p>
-                    )}
-                  </div>
-                  <span className="ml-4 text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded font-medium">
-                    {languageNames[set.language] || set.language}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">
-                    {set._count.flashcards} fiszek
-                  </span>
-                  <span className="text-gray-400">
-                    {new Date(set.updatedAt).toLocaleDateString('pl-PL')}
-                  </span>
-                </div>
-              </Card>
-            </Link>
+        <div className="space-y-8">
+          {sortedLanguages.map((language) => (
+            <div key={language}>
+              {/* Nagłówek języka */}
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-2xl">{languageFlags[language] || '🌍'}</span>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  {languageNames[language] || language}
+                </h2>
+                <span className="text-sm text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  {setsByLanguage[language].length} {setsByLanguage[language].length === 1 ? 'zestaw' :
+                    setsByLanguage[language].length < 5 ? 'zestawy' : 'zestawów'}
+                </span>
+              </div>
+
+              {/* Zestawy dla tego języka */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {setsByLanguage[language].map((set) => (
+                  <Link key={set.id} href={`/sets/${set.id}`}>
+                    <Card variant="interactive" className="p-5 h-full">
+                      <div className="mb-3">
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {set.name}
+                        </h3>
+                        {set.description && (
+                          <p className="text-sm text-gray-500 line-clamp-2">
+                            {set.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">
+                          {set._count.flashcards} fiszek
+                        </span>
+                        <span className="text-gray-400">
+                          {new Date(set.updatedAt).toLocaleDateString('pl-PL')}
+                        </span>
+                      </div>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
