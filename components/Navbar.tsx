@@ -3,28 +3,74 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 
-export function Navbar() {
+const ADMIN_CACHE_KEY = 'fiszki_admin_status'
+const ADMIN_CACHE_DURATION = 5 * 60 * 1000 // 5 minut
+
+function NavbarComponent() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
 
-  // Sprawdź czy użytkownik jest adminem
+  // Sprawdź czy użytkownik jest adminem (z cache)
   useEffect(() => {
+    if (!session?.user?.id) {
+      setIsAdmin(false)
+      return
+    }
+
+    const userId = session.user.id
+
+    // Sprawdź cache
+    const cached = localStorage.getItem(ADMIN_CACHE_KEY)
+    if (cached) {
+      try {
+        const { userId: cachedUserId, isAdmin: cachedIsAdmin, timestamp } = JSON.parse(cached)
+        if (cachedUserId === userId && Date.now() - timestamp < ADMIN_CACHE_DURATION) {
+          setIsAdmin(cachedIsAdmin)
+          return
+        }
+      } catch {
+        // Ignoruj błędy parsowania
+      }
+    }
+
+    // Fetch tylko jeśli brak cache lub wygasł
     const checkAdmin = async () => {
       try {
         const res = await fetch('/api/admin/users')
-        setIsAdmin(res.ok)
+        const adminStatus = res.ok
+        setIsAdmin(adminStatus)
+
+        // Zapisz do cache
+        localStorage.setItem(ADMIN_CACHE_KEY, JSON.stringify({
+          userId,
+          isAdmin: adminStatus,
+          timestamp: Date.now()
+        }))
       } catch {
         setIsAdmin(false)
       }
     }
-    if (session?.user) {
-      checkAdmin()
-    }
-  }, [session])
+
+    checkAdmin()
+  }, [session?.user?.id])
+
+  const handleMobileMenuToggle = useCallback(() => {
+    setMobileMenuOpen(prev => !prev)
+  }, [])
+
+  const handleMobileMenuClose = useCallback(() => {
+    setMobileMenuOpen(false)
+  }, [])
+
+  const handleSignOut = useCallback(() => {
+    // Wyczyść cache przy wylogowaniu
+    localStorage.removeItem(ADMIN_CACHE_KEY)
+    signOut({ callbackUrl: '/login' })
+  }, [])
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
@@ -47,6 +93,7 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  prefetch={true}
                   className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                     'admin' in link
                       ? pathname.startsWith(link.href)
@@ -70,7 +117,7 @@ export function Navbar() {
                   {session.user.email}
                 </span>
                 <button
-                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  onClick={handleSignOut}
                   className="text-sm text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
                 >
                   Wyloguj
@@ -82,7 +129,7 @@ export function Navbar() {
           {/* Mobile menu button */}
           <div className="flex items-center sm:hidden">
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={handleMobileMenuToggle}
               className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100"
             >
               <svg
@@ -120,12 +167,13 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={true}
                 className={`block px-4 py-2 text-base font-medium ${
                   pathname.startsWith(link.href)
                     ? 'text-primary-600 bg-primary-50'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
-                onClick={() => setMobileMenuOpen(false)}
+                onClick={handleMobileMenuClose}
               >
                 {link.label}
               </Link>
@@ -137,7 +185,7 @@ export function Navbar() {
                 <p className="text-sm text-gray-500">{session.user.email}</p>
               </div>
               <button
-                onClick={() => signOut({ callbackUrl: '/login' })}
+                onClick={handleSignOut}
                 className="block w-full text-left px-4 py-2 text-base font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50"
               >
                 Wyloguj
@@ -149,3 +197,5 @@ export function Navbar() {
     </nav>
   )
 }
+
+export const Navbar = memo(NavbarComponent)
