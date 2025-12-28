@@ -107,6 +107,14 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
   const [stats, setStats] = useState({ done: 0, correct: 0 })
   const [sessionStats, setSessionStats] = useState({ done: 0, correct: 0 })
 
+  // AI Explanation states
+  const [aiExplanation, setAiExplanation] = useState('')
+  const [loadingExplanation, setLoadingExplanation] = useState(false)
+  const [showAskInput, setShowAskInput] = useState(false)
+  const [customQuestion, setCustomQuestion] = useState('')
+  const [addingToTheory, setAddingToTheory] = useState(false)
+  const [addedToTheory, setAddedToTheory] = useState(false)
+
   useEffect(() => {
     fetchModule()
   }, [moduleId])
@@ -230,6 +238,11 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
       setCurrentExercise(prev => prev + 1)
       setUserAnswer('')
       setShowResult(false)
+      // Reset explanation state for next exercise
+      setAiExplanation('')
+      setShowAskInput(false)
+      setCustomQuestion('')
+      setAddedToTheory(false)
     } else {
       setShowExercises(false)
       setExercises([])
@@ -238,6 +251,62 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
 
   const selectOption = (option: string) => {
     setUserAnswer(option)
+  }
+
+  const requestExplanation = async (question?: string) => {
+    const exercise = exercises[currentExercise]
+    setLoadingExplanation(true)
+    setShowAskInput(false)
+
+    try {
+      const response = await fetch(`/api/grammar/${moduleId}/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sentence: exercise.sentence,
+          answer: exercise.answer,
+          userAnswer: userAnswer,
+          exerciseType: exercise.type,
+          question: question || customQuestion,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAiExplanation(data.explanation)
+      }
+    } catch (error) {
+      console.error('Failed to get explanation:', error)
+    } finally {
+      setLoadingExplanation(false)
+      setCustomQuestion('')
+    }
+  }
+
+  const addExplanationToTheory = async () => {
+    if (!aiExplanation) return
+
+    setAddingToTheory(true)
+    const exercise = exercises[currentExercise]
+
+    try {
+      const response = await fetch(`/api/grammar/${moduleId}/explain`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          explanation: aiExplanation,
+          context: `Ćwiczenie: "${exercise.sentence}" → ${exercise.answer}`,
+        }),
+      })
+
+      if (response.ok) {
+        setAddedToTheory(true)
+      }
+    } catch (error) {
+      console.error('Failed to add to theory:', error)
+    } finally {
+      setAddingToTheory(false)
+    }
   }
 
   if (loading) {
@@ -479,6 +548,133 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                       <span>📖</span> Wyjaśnienie:
                     </p>
                     <p className="text-gray-700 mt-1">{exercise.explanation}</p>
+                  </div>
+                )}
+
+                {/* AI Explanation Section */}
+                {!aiExplanation && !loadingExplanation && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    {!showAskInput ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => requestExplanation()}
+                          className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                        >
+                          <span>🤖</span>
+                          Wyjaśnij mi to
+                        </button>
+                        <button
+                          onClick={() => setShowAskInput(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                        >
+                          <span>❓</span>
+                          Mam pytanie
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-gray-600">Zadaj pytanie dotyczące tego ćwiczenia:</p>
+                        <input
+                          type="text"
+                          value={customQuestion}
+                          onChange={(e) => setCustomQuestion(e.target.value)}
+                          placeholder="Np. Dlaczego nie można użyć 'have' zamiast 'has'?"
+                          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && customQuestion.trim()) {
+                              requestExplanation(customQuestion)
+                            }
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => requestExplanation(customQuestion)}
+                            disabled={!customQuestion.trim()}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium disabled:opacity-50"
+                          >
+                            Zapytaj AI
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowAskInput(false)
+                              setCustomQuestion('')
+                            }}
+                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                          >
+                            Anuluj
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Loading Explanation */}
+                {loadingExplanation && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex items-center gap-3 text-purple-600">
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span className="font-medium">AI analizuje...</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Explanation Display */}
+                {aiExplanation && (
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xl">🤖</span>
+                        <span className="font-bold text-purple-800">Wyjaśnienie AI</span>
+                      </div>
+                      <div className="prose prose-sm max-w-none text-gray-700">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {aiExplanation}
+                        </ReactMarkdown>
+                      </div>
+
+                      {/* Add to Theory Button */}
+                      <div className="mt-4 pt-3 border-t border-purple-200 flex items-center justify-between">
+                        {!addedToTheory ? (
+                          <button
+                            onClick={addExplanationToTheory}
+                            disabled={addingToTheory}
+                            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium disabled:opacity-50"
+                          >
+                            {addingToTheory ? (
+                              <>
+                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Dodawanie...
+                              </>
+                            ) : (
+                              <>
+                                <span>📝</span>
+                                Dodaj do mojej teorii
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            Dodano do teorii!
+                          </div>
+                        )}
+                        <button
+                          onClick={() => setAiExplanation('')}
+                          className="text-sm text-gray-500 hover:text-gray-700"
+                        >
+                          Zamknij
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
