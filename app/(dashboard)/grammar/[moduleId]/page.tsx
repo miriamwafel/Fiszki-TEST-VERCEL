@@ -2,7 +2,6 @@
 
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
-import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
 import ReactMarkdown from 'react-markdown'
 
@@ -58,13 +57,37 @@ const languageFlags: Record<string, string> = {
   it: '🇮🇹',
 }
 
-const levelColors: Record<string, string> = {
-  A1: 'bg-green-100 text-green-700',
-  A2: 'bg-green-200 text-green-800',
-  B1: 'bg-blue-100 text-blue-700',
-  B2: 'bg-blue-200 text-blue-800',
-  C1: 'bg-purple-100 text-purple-700',
-  C2: 'bg-purple-200 text-purple-800',
+const languageGradients: Record<string, string> = {
+  en: 'from-blue-500 to-red-500',
+  de: 'from-gray-800 to-yellow-500',
+  es: 'from-red-500 to-yellow-500',
+  fr: 'from-blue-500 to-red-400',
+  it: 'from-green-500 to-red-500',
+}
+
+const levelBadges: Record<string, { bg: string; text: string; glow: string }> = {
+  A1: { bg: 'bg-emerald-500', text: 'text-white', glow: 'shadow-emerald-500/30' },
+  A2: { bg: 'bg-emerald-600', text: 'text-white', glow: 'shadow-emerald-600/30' },
+  B1: { bg: 'bg-blue-500', text: 'text-white', glow: 'shadow-blue-500/30' },
+  B2: { bg: 'bg-blue-600', text: 'text-white', glow: 'shadow-blue-600/30' },
+  C1: { bg: 'bg-purple-500', text: 'text-white', glow: 'shadow-purple-500/30' },
+  C2: { bg: 'bg-purple-600', text: 'text-white', glow: 'shadow-purple-600/30' },
+}
+
+const exerciseIcons: Record<string, string> = {
+  fill_gap: '✏️',
+  transform: '🔄',
+  choose: '🎯',
+  correct: '🔧',
+  translate: '🌐',
+}
+
+const exerciseColors: Record<string, { bg: string; border: string; text: string }> = {
+  fill_gap: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
+  transform: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  choose: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-700' },
+  correct: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700' },
+  translate: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
 }
 
 export default function GrammarModulePage({ params }: { params: Promise<{ moduleId: string }> }) {
@@ -81,6 +104,7 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
   const [showResult, setShowResult] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
   const [stats, setStats] = useState({ done: 0, correct: 0 })
+  const [sessionStats, setSessionStats] = useState({ done: 0, correct: 0 })
 
   useEffect(() => {
     fetchModule()
@@ -139,6 +163,7 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
         setCurrentExercise(0)
         setUserAnswer('')
         setShowResult(false)
+        setSessionStats({ done: 0, correct: 0 })
       }
     } catch (error) {
       console.error('Failed to generate exercises:', error)
@@ -178,18 +203,23 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
 
     setIsCorrect(correct)
     setShowResult(true)
-    setStats(prev => ({
+
+    const newStats = {
+      done: stats.done + 1,
+      correct: stats.correct + (correct ? 1 : 0),
+    }
+    setStats(newStats)
+    setSessionStats(prev => ({
       done: prev.done + 1,
       correct: prev.correct + (correct ? 1 : 0),
     }))
 
-    // Update stats in DB
     fetch(`/api/grammar/${moduleId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        exercisesDone: stats.done + 1,
-        exercisesCorrect: stats.correct + (correct ? 1 : 0),
+        exercisesDone: newStats.done,
+        exercisesCorrect: newStats.correct,
       }),
     })
   }
@@ -211,17 +241,31 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center py-20">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 border-4 border-primary-200 rounded-full" />
+          <div className="absolute inset-0 border-4 border-transparent border-t-primary-600 rounded-full animate-spin" />
+        </div>
+        <p className="mt-4 text-gray-500">Ładowanie modułu...</p>
       </div>
     )
   }
 
   if (!moduleData) {
     return (
-      <div className="max-w-3xl mx-auto text-center py-12">
-        <p className="text-gray-500">Nie znaleziono modułu</p>
-        <Link href="/grammar" className="text-primary-600 hover:underline mt-4 inline-block">
+      <div className="max-w-2xl mx-auto text-center py-20">
+        <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <span className="text-4xl">📚</span>
+        </div>
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Nie znaleziono modułu</h2>
+        <p className="text-gray-500 mb-6">Ten moduł może nie istnieć lub został usunięty.</p>
+        <Link
+          href="/grammar"
+          className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
           Wróć do listy modułów
         </Link>
       </div>
@@ -229,249 +273,420 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
   }
 
   const { module, grammar, level, progress, reviews } = moduleData
+  const levelStyle = levelBadges[level.level] || levelBadges.A1
+  const gradient = languageGradients[grammar.language] || 'from-gray-500 to-gray-700'
 
   // Widok ćwiczeń
   if (showExercises && exercises.length > 0) {
     const exercise = exercises[currentExercise]
+    const exColors = exerciseColors[exercise.type] || exerciseColors.fill_gap
+    const progressPercent = ((currentExercise + (showResult ? 1 : 0)) / exercises.length) * 100
 
     return (
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-8">
           <button
             onClick={() => {
               setShowExercises(false)
               setExercises([])
             }}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors mb-4"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Wróć do teorii
+            <span>Wróć do lekcji</span>
           </button>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">
-              {currentExercise + 1} / {exercises.length}
-            </span>
-            <span className="text-sm text-green-600">
-              ✓ {stats.correct}
-            </span>
-          </div>
-        </div>
 
-        {/* Progress bar */}
-        <div className="w-full h-2 bg-gray-200 rounded-full mb-6">
-          <div
-            className="h-full bg-primary-500 rounded-full transition-all"
-            style={{ width: `${((currentExercise + 1) / exercises.length) * 100}%` }}
-          />
+          {/* Progress header */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{exerciseIcons[exercise.type]}</span>
+              <div>
+                <h2 className="font-semibold text-gray-900">Ćwiczenie {currentExercise + 1} z {exercises.length}</h2>
+                <p className="text-sm text-gray-500">{module.titlePl}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{sessionStats.correct}</div>
+                <div className="text-xs text-gray-500">poprawne</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-gray-400">{sessionStats.done - sessionStats.correct}</div>
+                <div className="text-xs text-gray-500">błędne</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-primary-500 to-primary-600 transition-all duration-500 ease-out"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
 
         {/* Exercise card */}
-        <Card className="p-6">
-          <div className="mb-4">
-            <span className={`inline-block px-2 py-1 text-xs font-medium rounded ${
-              exercise.type === 'fill_gap' ? 'bg-blue-100 text-blue-700' :
-              exercise.type === 'transform' ? 'bg-purple-100 text-purple-700' :
-              exercise.type === 'choose' ? 'bg-green-100 text-green-700' :
-              exercise.type === 'correct' ? 'bg-red-100 text-red-700' :
-              'bg-yellow-100 text-yellow-700'
-            }`}>
+        <div className={`rounded-2xl border-2 ${exColors.border} ${exColors.bg} overflow-hidden shadow-lg`}>
+          {/* Type badge */}
+          <div className={`px-4 py-2 ${exColors.bg} border-b ${exColors.border}`}>
+            <span className={`inline-flex items-center gap-2 text-sm font-medium ${exColors.text}`}>
+              {exerciseIcons[exercise.type]}
               {exercise.type === 'fill_gap' ? 'Uzupełnij lukę' :
-               exercise.type === 'transform' ? 'Przekształć' :
-               exercise.type === 'choose' ? 'Wybierz' :
-               exercise.type === 'correct' ? 'Popraw błąd' :
-               'Przetłumacz'}
+               exercise.type === 'transform' ? 'Przekształć zdanie' :
+               exercise.type === 'choose' ? 'Wybierz poprawną odpowiedź' :
+               exercise.type === 'correct' ? 'Znajdź i popraw błąd' :
+               'Przetłumacz na język obcy'}
             </span>
           </div>
 
-          <p className="text-gray-700 mb-2">{exercise.instruction}</p>
+          <div className="p-6 bg-white">
+            {/* Instruction */}
+            <p className="text-gray-700 mb-4 text-lg">{exercise.instruction}</p>
 
-          <p className="text-xl font-medium text-gray-900 mb-6 p-4 bg-gray-50 rounded-lg">
-            {exercise.sentence}
-          </p>
-
-          {exercise.hint && !showResult && (
-            <p className="text-sm text-gray-500 mb-4">
-              💡 Podpowiedź: {exercise.hint}
-            </p>
-          )}
-
-          {/* Input or options */}
-          {exercise.type === 'choose' && exercise.options ? (
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              {exercise.options.map((option, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => !showResult && selectOption(option)}
-                  disabled={showResult}
-                  className={`p-3 rounded-lg border-2 text-left transition-all ${
-                    showResult
-                      ? option === exercise.answer
-                        ? 'border-green-500 bg-green-50'
-                        : option === userAnswer
-                        ? 'border-red-500 bg-red-50'
-                        : 'border-gray-200'
-                      : userAnswer === option
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  {option}
-                </button>
-              ))}
+            {/* Sentence */}
+            <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 mb-6 border border-gray-200">
+              <p className="text-xl font-medium text-gray-900 leading-relaxed">
+                {exercise.sentence}
+              </p>
             </div>
-          ) : (
-            <input
-              type="text"
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              disabled={showResult}
-              placeholder="Wpisz odpowiedź..."
-              className="w-full px-4 py-3 border rounded-lg mb-6 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !showResult && userAnswer.trim()) {
-                  checkAnswer()
-                }
-              }}
-            />
-          )}
 
-          {/* Result */}
-          {showResult && (
-            <div className={`p-4 rounded-lg mb-6 ${isCorrect ? 'bg-green-50' : 'bg-red-50'}`}>
-              <div className="flex items-center gap-2 mb-2">
-                {isCorrect ? (
-                  <>
-                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="font-medium text-green-700">Poprawnie!</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    <span className="font-medium text-red-700">Niepoprawnie</span>
-                  </>
+            {/* Hint */}
+            {exercise.hint && !showResult && (
+              <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl mb-6 border border-amber-200">
+                <span className="text-xl">💡</span>
+                <p className="text-amber-800">{exercise.hint}</p>
+              </div>
+            )}
+
+            {/* Input or options */}
+            {exercise.type === 'choose' && exercise.options ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                {exercise.options.map((option, idx) => {
+                  const isSelected = userAnswer === option
+                  const isAnswer = option === exercise.answer
+
+                  let buttonClass = 'p-4 rounded-xl border-2 text-left transition-all font-medium '
+
+                  if (showResult) {
+                    if (isAnswer) {
+                      buttonClass += 'border-green-500 bg-green-50 text-green-700'
+                    } else if (isSelected) {
+                      buttonClass += 'border-red-500 bg-red-50 text-red-700'
+                    } else {
+                      buttonClass += 'border-gray-200 bg-gray-50 text-gray-400'
+                    }
+                  } else {
+                    if (isSelected) {
+                      buttonClass += 'border-primary-500 bg-primary-50 text-primary-700 shadow-md'
+                    } else {
+                      buttonClass += 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700'
+                    }
+                  }
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => !showResult && selectOption(option)}
+                      disabled={showResult}
+                      className={buttonClass}
+                    >
+                      <span className="flex items-center gap-3">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold ${
+                          showResult && isAnswer ? 'bg-green-500 text-white' :
+                          showResult && isSelected ? 'bg-red-500 text-white' :
+                          isSelected ? 'bg-primary-500 text-white' :
+                          'bg-gray-200 text-gray-600'
+                        }`}>
+                          {String.fromCharCode(65 + idx)}
+                        </span>
+                        {option}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="mb-6">
+                <input
+                  type="text"
+                  value={userAnswer}
+                  onChange={(e) => setUserAnswer(e.target.value)}
+                  disabled={showResult}
+                  placeholder="Wpisz swoją odpowiedź..."
+                  className={`w-full px-5 py-4 text-lg border-2 rounded-xl transition-all focus:outline-none ${
+                    showResult
+                      ? isCorrect
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-red-500 bg-red-50'
+                      : 'border-gray-200 focus:border-primary-500 focus:ring-4 focus:ring-primary-100'
+                  }`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !showResult && userAnswer.trim()) {
+                      checkAnswer()
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Result */}
+            {showResult && (
+              <div className={`rounded-xl p-5 mb-6 ${isCorrect ? 'bg-green-50 border-2 border-green-200' : 'bg-red-50 border-2 border-red-200'}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  {isCorrect ? (
+                    <>
+                      <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="font-bold text-green-700 text-lg">Świetnie!</span>
+                        <p className="text-green-600 text-sm">Poprawna odpowiedź</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                      <div>
+                        <span className="font-bold text-red-700 text-lg">Nie tym razem</span>
+                        <p className="text-red-600 text-sm">Spróbuj zapamiętać poprawną formę</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {!isCorrect && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-red-200">
+                    <p className="text-gray-600 text-sm">Poprawna odpowiedź:</p>
+                    <p className="text-gray-900 font-semibold text-lg">{exercise.answer}</p>
+                  </div>
+                )}
+
+                {exercise.explanation && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                    <p className="text-gray-600 text-sm flex items-center gap-2">
+                      <span>📖</span> Wyjaśnienie:
+                    </p>
+                    <p className="text-gray-700 mt-1">{exercise.explanation}</p>
+                  </div>
                 )}
               </div>
-              {!isCorrect && (
-                <p className="text-gray-700">
-                  Poprawna odpowiedź: <strong>{exercise.answer}</strong>
-                </p>
-              )}
-              {exercise.explanation && (
-                <p className="text-sm text-gray-600 mt-2">
-                  {exercise.explanation}
-                </p>
+            )}
+
+            {/* Action button */}
+            <div className="flex justify-end">
+              {!showResult ? (
+                <Button
+                  onClick={checkAnswer}
+                  disabled={!userAnswer.trim()}
+                  className="px-8 py-3 text-lg"
+                >
+                  Sprawdź odpowiedź
+                </Button>
+              ) : (
+                <Button
+                  onClick={nextExercise}
+                  className="px-8 py-3 text-lg"
+                >
+                  {currentExercise < exercises.length - 1 ? (
+                    <span className="flex items-center gap-2">
+                      Następne
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      🎉 Zakończ
+                    </span>
+                  )}
+                </Button>
               )}
             </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="flex justify-end gap-3">
-            {!showResult ? (
-              <Button
-                onClick={checkAnswer}
-                disabled={!userAnswer.trim()}
-              >
-                Sprawdź
-              </Button>
-            ) : (
-              <Button onClick={nextExercise}>
-                {currentExercise < exercises.length - 1 ? 'Następne' : 'Zakończ'}
-              </Button>
-            )}
           </div>
-        </Card>
+        </div>
+
+        {/* Session summary at the end */}
+        {showResult && currentExercise === exercises.length - 1 && (
+          <div className="mt-6 p-6 bg-gradient-to-r from-primary-500 to-primary-600 rounded-2xl text-white text-center">
+            <h3 className="text-xl font-bold mb-2">Koniec ćwiczeń!</h3>
+            <p className="text-primary-100 mb-4">
+              Twój wynik w tej sesji: {sessionStats.correct} / {sessionStats.done} ({Math.round((sessionStats.correct / sessionStats.done) * 100)}%)
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={generateExercises}
+                className="px-6 py-2 bg-white text-primary-600 rounded-lg font-medium hover:bg-primary-50 transition-colors"
+              >
+                🔄 Nowe ćwiczenia
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
+  // Main view
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500 mb-6">
-        <Link href="/grammar" className="hover:text-gray-700">
-          Gramatyka
-        </Link>
-        <span>/</span>
-        <span className="flex items-center gap-1">
-          {languageFlags[grammar.language]} {grammar.languageName}
-        </span>
-        <span>/</span>
-        <span className={`px-2 py-0.5 rounded text-xs font-medium ${levelColors[level.level]}`}>
-          {level.level}
-        </span>
-      </div>
+      {/* Header with gradient */}
+      <div className={`relative rounded-2xl bg-gradient-to-r ${gradient} p-6 mb-8 overflow-hidden`}>
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="relative">
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-white/80 text-sm mb-4">
+            <Link href="/grammar" className="hover:text-white transition-colors">
+              Gramatyka
+            </Link>
+            <span>/</span>
+            <span className="flex items-center gap-1">
+              {languageFlags[grammar.language]} {grammar.languageName}
+            </span>
+            <span>/</span>
+            <span className={`px-2 py-0.5 rounded text-xs font-bold ${levelStyle.bg} ${levelStyle.text}`}>
+              {level.level}
+            </span>
+          </div>
 
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {module.titlePl}
-        </h1>
-        <p className="text-gray-600">
-          {module.descriptionPl}
-        </p>
-        <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
-          <span>⏱️ ~{module.estimatedMinutes} min</span>
-          {progress?.completed && (
-            <span className="text-green-600 flex items-center gap-1">
+          {/* Title */}
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
+            {module.titlePl}
+          </h1>
+          <p className="text-white/80 text-lg">
+            {module.descriptionPl}
+          </p>
+
+          {/* Meta info */}
+          <div className="flex flex-wrap items-center gap-4 mt-4">
+            <span className="flex items-center gap-2 text-white/90 bg-white/20 px-3 py-1 rounded-full text-sm">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Ukończone
+              ~{module.estimatedMinutes} min
             </span>
-          )}
-          {stats.done > 0 && (
-            <span className="text-blue-600">
-              Ćwiczenia: {stats.correct}/{stats.done} poprawnych
-            </span>
-          )}
+            {progress?.completed && (
+              <span className="flex items-center gap-2 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Ukończone
+              </span>
+            )}
+            {stats.done > 0 && (
+              <span className="flex items-center gap-2 text-white/90 bg-white/20 px-3 py-1 rounded-full text-sm">
+                📝 Ćwiczenia: {stats.correct}/{stats.done}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Content */}
       {!progress?.generatedContent ? (
-        <Card className="p-8 text-center">
-          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-            </svg>
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+          <div className="w-24 h-24 bg-gradient-to-br from-primary-100 to-primary-200 rounded-full flex items-center justify-center mx-auto mb-6">
+            <span className="text-5xl">📚</span>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <h3 className="text-2xl font-bold text-gray-900 mb-3">
             Rozpocznij naukę
           </h3>
-          <p className="text-gray-500 mb-6">
-            Kliknij przycisk poniżej, aby wygenerować materiał do nauki.
-            AI przygotuje szczegółowe wyjaśnienie tematu z przykładami.
+          <p className="text-gray-500 mb-8 max-w-md mx-auto">
+            Kliknij przycisk poniżej, aby AI wygenerowało dla Ciebie spersonalizowany materiał do nauki z przykładami i wyjaśnieniami.
           </p>
-          <Button onClick={generateContent} loading={generating}>
-            {generating ? 'Generowanie...' : 'Wygeneruj materiał'}
+          <Button onClick={generateContent} loading={generating} className="px-8 py-3 text-lg">
+            {generating ? (
+              <span className="flex items-center gap-2">
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Generowanie lekcji...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                ✨ Wygeneruj lekcję
+              </span>
+            )}
           </Button>
-        </Card>
+
+          {generating && (
+            <p className="text-sm text-gray-400 mt-4">
+              To może potrwać kilka sekund...
+            </p>
+          )}
+        </div>
       ) : (
         <>
           {/* Theory content */}
-          <Card className="p-6 mb-6">
-            <div className="prose prose-sm max-w-none">
-              <ReactMarkdown>{progress.generatedContent}</ReactMarkdown>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
+            <div className="p-6 sm:p-8">
+              <div className="prose prose-lg max-w-none
+                prose-headings:text-gray-900 prose-headings:font-bold
+                prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200
+                prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3
+                prose-p:text-gray-700 prose-p:leading-relaxed
+                prose-strong:text-gray-900
+                prose-ul:my-4 prose-li:text-gray-700
+                prose-code:bg-gray-100 prose-code:px-2 prose-code:py-0.5 prose-code:rounded prose-code:text-primary-600 prose-code:font-normal
+                prose-pre:bg-gray-900 prose-pre:text-gray-100
+              ">
+                <ReactMarkdown
+                  components={{
+                    h2: ({ children }) => (
+                      <h2 className="flex items-center gap-3">
+                        <span className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 text-lg">
+                          {children?.toString().includes('Wprowadzenie') ? '👋' :
+                           children?.toString().includes('Zasady') ? '📋' :
+                           children?.toString().includes('Przykłady') ? '💬' :
+                           children?.toString().includes('błędy') ? '⚠️' :
+                           children?.toString().includes('Wskazówki') ? '💡' :
+                           children?.toString().includes('Podsumowanie') ? '✅' : '📖'}
+                        </span>
+                        {children}
+                      </h2>
+                    ),
+                  }}
+                >
+                  {progress.generatedContent}
+                </ReactMarkdown>
+              </div>
             </div>
-          </Card>
+          </div>
 
           {/* Actions */}
-          <Card className="p-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <Button
                   onClick={generateExercises}
                   loading={generatingExercises}
                   variant="secondary"
+                  className="px-6"
                 >
-                  {generatingExercises ? 'Generowanie...' : 'Ćwiczenia'}
+                  {generatingExercises ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Generowanie...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      🎯 Ćwicz gramatykę
+                    </span>
+                  )}
                 </Button>
 
                 {!progress.completed && (
@@ -479,30 +694,28 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                     onClick={markComplete}
                     loading={completing}
                   >
-                    Oznacz jako ukończone
+                    {completing ? 'Zapisywanie...' : '✅ Oznacz jako ukończone'}
                   </Button>
                 )}
               </div>
 
               {progress.completed && reviews.length > 0 && (
-                <div className="text-sm text-gray-500">
-                  <span className="font-medium">Powtórki:</span>
-                  {reviews.filter(r => !r.completed).map((review, idx) => (
-                    <span key={review.id} className="ml-2">
-                      {idx > 0 && ', '}
-                      +{review.dayOffset}d
-                    </span>
-                  ))}
+                <div className="text-sm text-gray-500 flex items-center gap-2">
+                  <span>📅</span>
+                  <span className="font-medium">Powtórki zaplanowane</span>
                 </div>
               )}
             </div>
-          </Card>
+          </div>
 
           {/* Reviews schedule */}
           {progress.completed && reviews.length > 0 && (
-            <Card className="p-4 mt-4">
-              <h3 className="font-medium text-gray-900 mb-3">Harmonogram powtórek</h3>
-              <div className="space-y-2">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mt-6">
+              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="text-xl">📅</span>
+                Harmonogram powtórek
+              </h3>
+              <div className="grid gap-3">
                 {reviews.map((review) => {
                   const date = new Date(review.scheduledDate)
                   const today = new Date()
@@ -515,50 +728,60 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                   return (
                     <div
                       key={review.id}
-                      className={`flex items-center justify-between p-3 rounded-lg ${
+                      className={`flex items-center justify-between p-4 rounded-xl transition-all ${
                         review.completed
-                          ? 'bg-gray-50 text-gray-400'
+                          ? 'bg-gray-50 border border-gray-200'
                           : isOverdue
-                          ? 'bg-red-50'
+                          ? 'bg-red-50 border-2 border-red-200'
                           : isToday
-                          ? 'bg-green-50'
-                          : 'bg-blue-50'
+                          ? 'bg-green-50 border-2 border-green-200'
+                          : 'bg-blue-50 border border-blue-200'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
                         {review.completed ? (
-                          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
                         ) : (
-                          <div className={`w-5 h-5 rounded-full border-2 ${
-                            isOverdue ? 'border-red-400' : isToday ? 'border-green-400' : 'border-blue-400'
-                          }`} />
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
+                            isOverdue ? 'bg-red-500 text-white' :
+                            isToday ? 'bg-green-500 text-white' :
+                            'bg-blue-500 text-white'
+                          }`}>
+                            +{review.dayOffset}
+                          </div>
                         )}
-                        <span className={`font-medium ${
-                          review.completed ? 'line-through' : ''
-                        }`}>
-                          {date.toLocaleDateString('pl-PL', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                          })}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          (+{review.dayOffset} dni)
-                        </span>
+                        <div>
+                          <span className={`font-semibold ${review.completed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                            {date.toLocaleDateString('pl-PL', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                            })}
+                          </span>
+                          <p className="text-sm text-gray-500">
+                            {review.dayOffset === 1 ? 'Jutro' : `Za ${review.dayOffset} dni od ukończenia`}
+                          </p>
+                        </div>
                       </div>
                       {isOverdue && !review.completed && (
-                        <span className="text-xs text-red-600 font-medium">Zaległa!</span>
+                        <span className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
+                          ZALEGŁE
+                        </span>
                       )}
                       {isToday && !review.completed && (
-                        <span className="text-xs text-green-600 font-medium">Dzisiaj!</span>
+                        <span className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full animate-pulse">
+                          DZISIAJ
+                        </span>
                       )}
                     </div>
                   )
                 })}
               </div>
-            </Card>
+            </div>
           )}
         </>
       )}
