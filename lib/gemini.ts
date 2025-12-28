@@ -168,6 +168,123 @@ Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
   return parsed
 }
 
+// SZYBKIE generowanie - tylko historia bez vocabulary (3-5s zamiast 15-30s)
+export interface QuickStoryResult {
+  title: string
+  content: string
+}
+
+export async function generateStoryFast(
+  language: string,
+  wordCount: number,
+  difficulty: string,
+  topic?: string
+): Promise<QuickStoryResult> {
+  const difficultyDescriptions: Record<string, string> = {
+    'A1': 'bardzo prosty, podstawowe słownictwo, proste zdania',
+    'A2': 'prosty, częste słowa, krótkie zdania',
+    'B1': 'średnio zaawansowany, różnorodne słownictwo',
+    'B2': 'zaawansowany, złożone struktury gramatyczne',
+    'C1': 'wysoko zaawansowany, idiomy i wyrażenia potoczne',
+    'C2': 'poziom native, skomplikowane słownictwo i styl',
+  }
+
+  const topicInstruction = topic ? `\n- Temat/motyw przewodni: ${topic}` : ''
+
+  const prompt = `Napisz krótką historię/opowiadanie w języku ${language}.
+
+Wymagania:
+- Około ${wordCount} słów
+- Poziom trudności: ${difficulty} (${difficultyDescriptions[difficulty] || difficulty})
+- Historia powinna być interesująca i angażująca${topicInstruction}
+
+Odpowiedz w formacie JSON:
+{
+  "title": "Tytuł historii w ${language}",
+  "content": "Treść historii..."
+}
+
+Odpowiedz TYLKO JSON, bez dodatkowego tekstu.`
+
+  const result = await gemini.generateContent(prompt)
+  const response = result.response.text()
+
+  const jsonMatch = response.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    throw new Error('Invalid response format from Gemini')
+  }
+
+  return JSON.parse(jsonMatch[0])
+}
+
+// Generowanie vocabulary dla istniejącej historii (w tle)
+export async function generateVocabularyForStory(
+  content: string,
+  language: string,
+  difficulty: string
+): Promise<{ vocabulary: { word: string; translation: string }[]; vocabularyMap: Record<string, VocabularyEntry> }> {
+  const prompt = `Przeanalizuj poniższy tekst w języku ${language} (poziom ${difficulty}) i stwórz słowniczek.
+
+TEKST:
+${content}
+
+Odpowiedz w formacie JSON:
+{
+  "vocabulary": [
+    {"word": "słowo1", "translation": "tłumaczenie1"},
+    {"word": "słowo2", "translation": "tłumaczenie2"}
+  ],
+  "vocabularyMap": {
+    "went": {
+      "translation": "poszedł/poszła",
+      "partOfSpeech": "verb",
+      "infinitive": "go",
+      "infinitiveTranslation": "iść",
+      "tenseInfo": "czas przeszły prosty"
+    },
+    "beautiful": {
+      "translation": "piękny",
+      "partOfSpeech": "adjective"
+    }
+  }
+}
+
+WAŻNE:
+- vocabularyMap: WSZYSTKIE unikalne słowa z tekstu (bez przyimków, rodzajników, spójników)
+- Klucze to DOKŁADNE formy z tekstu (np. "went", "houses")
+- Dla czasowników odmienonych: infinitive, infinitiveTranslation, tenseInfo
+- vocabulary: 10-15 najważniejszych/najtrudniejszych słów
+
+Odpowiedz TYLKO JSON.`
+
+  const result = await gemini.generateContent(prompt)
+  const response = result.response.text()
+
+  const jsonMatch = response.match(/\{[\s\S]*\}/)
+  if (!jsonMatch) {
+    return { vocabulary: [], vocabularyMap: {} }
+  }
+
+  const parsed = JSON.parse(jsonMatch[0])
+
+  // Normalizuj vocabularyMap
+  if (parsed.vocabularyMap) {
+    const normalizedMap: Record<string, VocabularyEntry> = {}
+    for (const [key, value] of Object.entries(parsed.vocabularyMap)) {
+      if (typeof value === 'string') {
+        normalizedMap[key.toLowerCase()] = { translation: value }
+      } else {
+        normalizedMap[key.toLowerCase()] = value as VocabularyEntry
+      }
+    }
+    parsed.vocabularyMap = normalizedMap
+  } else {
+    parsed.vocabularyMap = {}
+  }
+
+  return parsed
+}
+
 export interface GapExercise {
   sentence: string
   word: string
