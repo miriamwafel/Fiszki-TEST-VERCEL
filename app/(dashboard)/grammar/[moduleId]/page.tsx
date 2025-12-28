@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface ModuleData {
   module: {
@@ -631,30 +632,96 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
           {/* Theory content */}
           <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mb-6">
             <div className="p-6 sm:p-8">
-              <div className="prose prose-lg max-w-none
-                prose-headings:text-gray-900 prose-headings:font-bold
-                prose-h2:text-2xl prose-h2:mt-8 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200
-                prose-h3:text-xl prose-h3:mt-6 prose-h3:mb-3
-                prose-p:text-gray-700 prose-p:leading-relaxed
-                prose-strong:text-gray-900
-                prose-ul:my-4 prose-li:text-gray-700
-                prose-code:bg-gray-100 prose-code:px-2 prose-code:py-0.5 prose-code:rounded prose-code:text-primary-600 prose-code:font-normal
-                prose-pre:bg-gray-900 prose-pre:text-gray-100
-              ">
+              <div className="grammar-content">
                 <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
                   components={{
                     h2: ({ children }) => (
-                      <h2 className="flex items-center gap-3">
-                        <span className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center text-primary-600 text-lg">
-                          {children?.toString().includes('Wprowadzenie') ? '👋' :
-                           children?.toString().includes('Zasady') ? '📋' :
-                           children?.toString().includes('Przykłady') ? '💬' :
-                           children?.toString().includes('błędy') ? '⚠️' :
-                           children?.toString().includes('Wskazówki') ? '💡' :
-                           children?.toString().includes('Podsumowanie') ? '✅' : '📖'}
-                        </span>
+                      <h2 className="text-2xl font-bold text-gray-900 mt-8 mb-4 pb-2 border-b-2 border-primary-200 flex items-center gap-3">
                         {children}
                       </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 className="text-xl font-bold text-gray-800 mt-6 mb-3 flex items-center gap-2">
+                        {children}
+                      </h3>
+                    ),
+                    p: ({ children }) => (
+                      <p className="text-gray-700 leading-relaxed my-3">
+                        {children}
+                      </p>
+                    ),
+                    strong: ({ children }) => (
+                      <strong className="font-bold text-gray-900">{children}</strong>
+                    ),
+                    ul: ({ children }) => (
+                      <ul className="my-4 space-y-2 list-none">
+                        {children}
+                      </ul>
+                    ),
+                    li: ({ children }) => (
+                      <li className="flex items-start gap-2 text-gray-700">
+                        <span className="text-primary-500 mt-1">•</span>
+                        <span>{children}</span>
+                      </li>
+                    ),
+                    blockquote: ({ children }) => (
+                      <blockquote className="my-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-primary-500 rounded-r-lg">
+                        {children}
+                      </blockquote>
+                    ),
+                    code: ({ className, children }) => {
+                      const isBlock = className?.includes('language-')
+                      if (isBlock) {
+                        return (
+                          <div className="my-4 bg-gradient-to-r from-gray-800 to-gray-900 rounded-xl p-5 overflow-x-auto shadow-lg">
+                            <pre className="text-gray-100 font-mono text-sm leading-relaxed whitespace-pre-wrap">
+                              {children}
+                            </pre>
+                          </div>
+                        )
+                      }
+                      return (
+                        <code className="px-2 py-1 bg-primary-100 text-primary-700 rounded font-mono text-sm font-medium">
+                          {children}
+                        </code>
+                      )
+                    },
+                    pre: ({ children }) => <>{children}</>,
+                    table: ({ children }) => (
+                      <div className="my-6 overflow-hidden rounded-xl border-2 border-gray-200 shadow-md">
+                        <table className="w-full border-collapse">
+                          {children}
+                        </table>
+                      </div>
+                    ),
+                    thead: ({ children }) => (
+                      <thead className="bg-gradient-to-r from-primary-500 to-primary-600 text-white">
+                        {children}
+                      </thead>
+                    ),
+                    th: ({ children }) => (
+                      <th className="px-4 py-3 text-left font-bold text-sm uppercase tracking-wide">
+                        {children}
+                      </th>
+                    ),
+                    tbody: ({ children }) => (
+                      <tbody className="divide-y divide-gray-100">
+                        {children}
+                      </tbody>
+                    ),
+                    tr: ({ children }) => (
+                      <tr className="hover:bg-gray-50 transition-colors even:bg-gray-50/50">
+                        {children}
+                      </tr>
+                    ),
+                    td: ({ children }) => (
+                      <td className="px-4 py-3 text-gray-700">
+                        {children}
+                      </td>
+                    ),
+                    hr: () => (
+                      <hr className="my-8 border-t-2 border-gray-200" />
                     ),
                   }}
                 >

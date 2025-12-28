@@ -133,42 +133,86 @@ export async function POST(
 
     const langName = languageNames[moduleData.grammar.language] || moduleData.grammar.language
 
-    const prompt = `Jesteś nauczycielem języka ${langName}. Przygotuj kompleksową lekcję gramatyczną na temat:
+    const prompt = `Jesteś doświadczonym nauczycielem języka ${langName}. Przygotuj WIZUALNIE ATRAKCYJNĄ lekcję gramatyczną.
 
-Temat: ${moduleData.module.title}
-Poziom: ${moduleData.level.level}
-Opis: ${moduleData.module.description}
+**TEMAT:** ${moduleData.module.title}
+**POZIOM:** ${moduleData.level.level}
+**OPIS:** ${moduleData.module.description}
 
-${userWords ? `Użytkownik zna te słowa, użyj ich w przykładach jeśli pasują: ${userWords}` : ''}
+${userWords ? `Użytkownik zna te słowa - użyj ich w przykładach: ${userWords}` : ''}
 
-Struktura lekcji (w formacie Markdown):
+## WYMAGANIA FORMATOWANIA - BARDZO WAŻNE:
 
-## Wprowadzenie
-Krótkie wyjaśnienie czym jest ta konstrukcja gramatyczna i kiedy jej używamy.
+### 1. TABELKI - używaj ich OBOWIĄZKOWO dla:
+- Odmian czasowników (osoba | forma | przykład)
+- Porównań (np. ser vs estar, Present Simple vs Continuous)
+- Końcówek gramatycznych
+- Zaimków, przyimków
 
-## Zasady
-Wyjaśnij dokładnie reguły gramatyczne z podziałem na:
-- Tworzenie zdań twierdzących
-- Tworzenie zdań przeczących
-- Tworzenie pytań
+Przykład tabeli:
+| Osoba | Forma | Przykład |
+|-------|-------|----------|
+| yo | hablo | Yo hablo español |
+| tú | hablas | Tú hablas bien |
 
-## Przykłady
-Podaj minimum 10 przykładowych zdań z tłumaczeniem na polski. Użyj różnorodnych przykładów.
+### 2. SCHEMATY - używaj strzałek i symboli:
+- → dla przekształceń (be + ing → am eating)
+- ✓ dla poprawnych form
+- ✗ dla błędnych form
+- ⚠️ dla pułapek/wyjątków
+- 💡 dla wskazówek
+- 📌 dla ważnych reguł
 
-## Typowe błędy
-Wymień 3-5 typowych błędów, które popełniają Polacy i jak ich unikać.
+### 3. WZORY/FORMUŁY w blokach:
+\`\`\`
+TWIERDZENIE: Subject + verb + object
+PRZECZENIE:  Subject + do/does + not + verb
+PYTANIE:     Do/Does + subject + verb?
+\`\`\`
 
-## Wskazówki
-Praktyczne wskazówki do zapamiętania.
+### 4. PORÓWNANIA wizualne:
+| ✓ Poprawnie | ✗ Błędnie |
+|-------------|-----------|
+| I am eating | I eating |
 
-## Podsumowanie
-Krótkie podsumowanie najważniejszych punktów.
+---
 
-WAŻNE:
-- Pisz po polsku (wyjaśnienia)
-- Przykłady w języku ${langName} z tłumaczeniem polskim
-- Dostosuj poziom trudności do ${moduleData.level.level}
-- Bądź praktyczny i konkretny`
+## STRUKTURA LEKCJI:
+
+### 🎯 Na początek
+Jedno zdanie - do czego służy ta konstrukcja. Kiedy jej użyjesz w życiu?
+
+### 📐 Budowa (ze schematami!)
+Pokaż WIZUALNIE jak budować zdania. Użyj:
+- Tabelek z odmianą
+- Wzorów w blokach kodu
+- Strzałek pokazujących przekształcenia
+
+### 📊 Odmiana (TABELKA!)
+ZAWSZE daj pełną tabelę odmiany jeśli dotyczy czasownika.
+
+### 💬 Przykłady w kontekście
+Minimum 8 przykładów. Format:
+> **🇬🇧** I am learning Spanish.
+> **🇵🇱** Uczę się hiszpańskiego.
+
+### ⚠️ Uwaga na błędy!
+Tabelka porównawcza ✓ vs ✗
+
+### 🧠 Zapamiętaj
+3-4 kluczowe punkty z emoji 📌
+
+### 🎓 Pro tip
+Jedna praktyczna wskazówka dla zaawansowanych.
+
+---
+
+**ZASADY:**
+- Pisz po polsku, przykłady w języku ${langName}
+- Poziom: ${moduleData.level.level}
+- DUŻO tabelek i schematów!
+- Używaj emoji jako wizualnych markerów
+- Bądź konkretny i praktyczny`
 
     const result = await model.generateContent(prompt)
     const content = result.response.text()
