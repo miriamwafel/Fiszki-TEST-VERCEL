@@ -1,0 +1,827 @@
+// Predefiniowane moduły gramatyczne dla każdego języka i poziomu
+
+export interface GrammarModule {
+  id: string
+  title: string
+  titlePl: string
+  description: string
+  descriptionPl: string
+  order: number
+  estimatedMinutes: number
+}
+
+export interface GrammarLevel {
+  level: string
+  modules: GrammarModule[]
+}
+
+export interface LanguageGrammar {
+  language: string
+  languageName: string
+  levels: GrammarLevel[]
+}
+
+// Angielski
+const englishGrammar: LanguageGrammar = {
+  language: 'en',
+  languageName: 'Angielski',
+  levels: [
+    {
+      level: 'A1',
+      modules: [
+        {
+          id: 'en_a1_to_be',
+          title: 'Verb "to be"',
+          titlePl: 'Czasownik "to be" (być)',
+          description: 'Learn how to use am, is, are in affirmative, negative and questions',
+          descriptionPl: 'Naucz się używać am, is, are w zdaniach twierdzących, przeczeniach i pytaniach',
+          order: 1,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'en_a1_articles',
+          title: 'Articles a/an/the',
+          titlePl: 'Przedimki a/an/the',
+          description: 'When to use a, an, the or no article',
+          descriptionPl: 'Kiedy używać a, an, the lub nie używać przedimka',
+          order: 2,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_a1_pronouns',
+          title: 'Personal pronouns',
+          titlePl: 'Zaimki osobowe',
+          description: 'I, you, he, she, it, we, they - subject and object pronouns',
+          descriptionPl: 'I, you, he, she, it, we, they - zaimki w funkcji podmiotu i dopełnienia',
+          order: 3,
+          estimatedMinutes: 15,
+        },
+        {
+          id: 'en_a1_possessives',
+          title: 'Possessive adjectives',
+          titlePl: 'Przymiotniki dzierżawcze',
+          description: 'My, your, his, her, its, our, their',
+          descriptionPl: 'Mój, twój, jego, jej, nasz, wasz, ich',
+          order: 4,
+          estimatedMinutes: 15,
+        },
+        {
+          id: 'en_a1_present_simple',
+          title: 'Present Simple',
+          titlePl: 'Czas Present Simple',
+          description: 'Habits, routines, facts and general truths',
+          descriptionPl: 'Nawyki, rutyny, fakty i ogólne prawdy',
+          order: 5,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_a1_plurals',
+          title: 'Plural nouns',
+          titlePl: 'Liczba mnoga rzeczowników',
+          description: 'Regular and irregular plurals',
+          descriptionPl: 'Regularna i nieregularna liczba mnoga',
+          order: 6,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'en_a1_there_is_are',
+          title: 'There is / There are',
+          titlePl: 'There is / There are',
+          description: 'Describing what exists or is present',
+          descriptionPl: 'Opisywanie co istnieje lub jest obecne',
+          order: 7,
+          estimatedMinutes: 15,
+        },
+        {
+          id: 'en_a1_can',
+          title: 'Modal verb "can"',
+          titlePl: 'Czasownik modalny "can"',
+          description: 'Ability and permission',
+          descriptionPl: 'Umiejętność i pozwolenie',
+          order: 8,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'en_a1_imperatives',
+          title: 'Imperatives',
+          titlePl: 'Tryb rozkazujący',
+          description: 'Giving commands and instructions',
+          descriptionPl: 'Wydawanie poleceń i instrukcji',
+          order: 9,
+          estimatedMinutes: 15,
+        },
+        {
+          id: 'en_a1_prepositions_place',
+          title: 'Prepositions of place',
+          titlePl: 'Przyimki miejsca',
+          description: 'In, on, at, under, next to, between',
+          descriptionPl: 'In, on, at, under, next to, between',
+          order: 10,
+          estimatedMinutes: 20,
+        },
+      ],
+    },
+    {
+      level: 'A2',
+      modules: [
+        {
+          id: 'en_a2_past_simple',
+          title: 'Past Simple',
+          titlePl: 'Czas Past Simple',
+          description: 'Completed actions in the past',
+          descriptionPl: 'Zakończone czynności w przeszłości',
+          order: 1,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_a2_irregular_verbs',
+          title: 'Irregular verbs',
+          titlePl: 'Czasowniki nieregularne',
+          description: 'Common irregular verb forms',
+          descriptionPl: 'Popularne formy czasowników nieregularnych',
+          order: 2,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'en_a2_present_continuous',
+          title: 'Present Continuous',
+          titlePl: 'Czas Present Continuous',
+          description: 'Actions happening now or around now',
+          descriptionPl: 'Czynności dziejące się teraz lub w okolicy teraz',
+          order: 3,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_a2_future_going_to',
+          title: 'Future with "going to"',
+          titlePl: 'Przyszłość z "going to"',
+          description: 'Plans and intentions',
+          descriptionPl: 'Plany i zamiary',
+          order: 4,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'en_a2_future_will',
+          title: 'Future with "will"',
+          titlePl: 'Przyszłość z "will"',
+          description: 'Predictions and spontaneous decisions',
+          descriptionPl: 'Przewidywania i spontaniczne decyzje',
+          order: 5,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'en_a2_comparatives',
+          title: 'Comparatives',
+          titlePl: 'Stopień wyższy przymiotników',
+          description: 'Comparing two things',
+          descriptionPl: 'Porównywanie dwóch rzeczy',
+          order: 6,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_a2_superlatives',
+          title: 'Superlatives',
+          titlePl: 'Stopień najwyższy przymiotników',
+          description: 'The most, the best, the biggest',
+          descriptionPl: 'Najbardziej, najlepszy, największy',
+          order: 7,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_a2_countable_uncountable',
+          title: 'Countable & Uncountable nouns',
+          titlePl: 'Rzeczowniki policzalne i niepoliczalne',
+          description: 'Some, any, much, many, a lot of',
+          descriptionPl: 'Some, any, much, many, a lot of',
+          order: 8,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_a2_adverbs_frequency',
+          title: 'Adverbs of frequency',
+          titlePl: 'Przysłówki częstotliwości',
+          description: 'Always, usually, often, sometimes, never',
+          descriptionPl: 'Zawsze, zazwyczaj, często, czasami, nigdy',
+          order: 9,
+          estimatedMinutes: 15,
+        },
+        {
+          id: 'en_a2_prepositions_time',
+          title: 'Prepositions of time',
+          titlePl: 'Przyimki czasu',
+          description: 'In, on, at with time expressions',
+          descriptionPl: 'In, on, at z wyrażeniami czasowymi',
+          order: 10,
+          estimatedMinutes: 20,
+        },
+      ],
+    },
+    {
+      level: 'B1',
+      modules: [
+        {
+          id: 'en_b1_present_perfect',
+          title: 'Present Perfect',
+          titlePl: 'Czas Present Perfect',
+          description: 'Experiences, recent actions, unfinished time',
+          descriptionPl: 'Doświadczenia, ostatnie działania, niedokończony czas',
+          order: 1,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'en_b1_present_perfect_vs_past',
+          title: 'Present Perfect vs Past Simple',
+          titlePl: 'Present Perfect vs Past Simple',
+          description: 'When to use which tense',
+          descriptionPl: 'Kiedy używać którego czasu',
+          order: 2,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_b1_past_continuous',
+          title: 'Past Continuous',
+          titlePl: 'Czas Past Continuous',
+          description: 'Background actions in the past',
+          descriptionPl: 'Czynności w tle w przeszłości',
+          order: 3,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_b1_modals_obligation',
+          title: 'Modals: must, have to, should',
+          titlePl: 'Czasowniki modalne: must, have to, should',
+          description: 'Obligation, necessity and advice',
+          descriptionPl: 'Obowiązek, konieczność i rada',
+          order: 4,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_b1_first_conditional',
+          title: 'First Conditional',
+          titlePl: 'Pierwszy tryb warunkowy',
+          description: 'Real possibilities in the future',
+          descriptionPl: 'Realne możliwości w przyszłości',
+          order: 5,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_b1_second_conditional',
+          title: 'Second Conditional',
+          titlePl: 'Drugi tryb warunkowy',
+          description: 'Hypothetical situations',
+          descriptionPl: 'Sytuacje hipotetyczne',
+          order: 6,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_b1_passive_voice',
+          title: 'Passive Voice (basics)',
+          titlePl: 'Strona bierna (podstawy)',
+          description: 'When the action is more important than who does it',
+          descriptionPl: 'Gdy czynność jest ważniejsza niż kto ją wykonuje',
+          order: 7,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_b1_relative_clauses',
+          title: 'Relative clauses',
+          titlePl: 'Zdania względne',
+          description: 'Who, which, that, where, when',
+          descriptionPl: 'Who, which, that, where, when',
+          order: 8,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_b1_reported_speech_intro',
+          title: 'Reported Speech (introduction)',
+          titlePl: 'Mowa zależna (wprowadzenie)',
+          description: 'Reporting what someone said',
+          descriptionPl: 'Przekazywanie co ktoś powiedział',
+          order: 9,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_b1_gerund_infinitive',
+          title: 'Gerund vs Infinitive',
+          titlePl: 'Gerund vs Infinitive',
+          description: 'Verbs followed by -ing or to + verb',
+          descriptionPl: 'Czasowniki po których następuje -ing lub to + czasownik',
+          order: 10,
+          estimatedMinutes: 40,
+        },
+      ],
+    },
+    {
+      level: 'B2',
+      modules: [
+        {
+          id: 'en_b2_present_perfect_continuous',
+          title: 'Present Perfect Continuous',
+          titlePl: 'Czas Present Perfect Continuous',
+          description: 'Duration of recent activities',
+          descriptionPl: 'Czas trwania ostatnich czynności',
+          order: 1,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_b2_past_perfect',
+          title: 'Past Perfect',
+          titlePl: 'Czas Past Perfect',
+          description: 'The past before the past',
+          descriptionPl: 'Przeszłość przed przeszłością',
+          order: 2,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_b2_third_conditional',
+          title: 'Third Conditional',
+          titlePl: 'Trzeci tryb warunkowy',
+          description: 'Hypothetical past situations',
+          descriptionPl: 'Hipotetyczne sytuacje w przeszłości',
+          order: 3,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_b2_mixed_conditionals',
+          title: 'Mixed Conditionals',
+          titlePl: 'Mieszane tryby warunkowe',
+          description: 'Mixing second and third conditionals',
+          descriptionPl: 'Łączenie drugiego i trzeciego trybu warunkowego',
+          order: 4,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'en_b2_passive_advanced',
+          title: 'Passive Voice (advanced)',
+          titlePl: 'Strona bierna (zaawansowana)',
+          description: 'Passive with modals, reporting verbs',
+          descriptionPl: 'Strona bierna z czasownikami modalnymi, czasownikami mówienia',
+          order: 5,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'en_b2_reported_speech_advanced',
+          title: 'Reported Speech (advanced)',
+          titlePl: 'Mowa zależna (zaawansowana)',
+          description: 'Reporting questions, commands, requests',
+          descriptionPl: 'Przekazywanie pytań, poleceń, próśb',
+          order: 6,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'en_b2_wish_if_only',
+          title: 'Wish / If only',
+          titlePl: 'Wish / If only',
+          description: 'Expressing regrets and wishes',
+          descriptionPl: 'Wyrażanie żalów i życzeń',
+          order: 7,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_b2_modals_deduction',
+          title: 'Modals for deduction',
+          titlePl: 'Czasowniki modalne do dedukcji',
+          description: 'Must, might, can\'t, could for speculation',
+          descriptionPl: 'Must, might, can\'t, could do spekulacji',
+          order: 8,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'en_b2_causative',
+          title: 'Causative (have something done)',
+          titlePl: 'Konstrukcja sprawcza (have something done)',
+          description: 'When someone does something for you',
+          descriptionPl: 'Gdy ktoś robi coś dla ciebie',
+          order: 9,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'en_b2_cleft_sentences',
+          title: 'Cleft sentences',
+          titlePl: 'Zdania rozdzielcze',
+          description: 'It was... who/that, What I need is...',
+          descriptionPl: 'To było... kto/że, Czego potrzebuję to...',
+          order: 10,
+          estimatedMinutes: 30,
+        },
+      ],
+    },
+  ],
+}
+
+// Niemiecki
+const germanGrammar: LanguageGrammar = {
+  language: 'de',
+  languageName: 'Niemiecki',
+  levels: [
+    {
+      level: 'A1',
+      modules: [
+        {
+          id: 'de_a1_sein_haben',
+          title: 'Verben "sein" und "haben"',
+          titlePl: 'Czasowniki "sein" i "haben"',
+          description: 'Die wichtigsten Verben im Deutschen',
+          descriptionPl: 'Najważniejsze czasowniki w niemieckim',
+          order: 1,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'de_a1_artikel',
+          title: 'Bestimmte und unbestimmte Artikel',
+          titlePl: 'Rodzajniki określone i nieokreślone',
+          description: 'Der, die, das / ein, eine',
+          descriptionPl: 'Der, die, das / ein, eine',
+          order: 2,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'de_a1_praesens',
+          title: 'Präsens',
+          titlePl: 'Czas teraźniejszy',
+          description: 'Konjugation regelmäßiger Verben',
+          descriptionPl: 'Odmiana czasowników regularnych',
+          order: 3,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'de_a1_personalpronomen',
+          title: 'Personalpronomen',
+          titlePl: 'Zaimki osobowe',
+          description: 'Ich, du, er, sie, es, wir, ihr, sie',
+          descriptionPl: 'Ich, du, er, sie, es, wir, ihr, sie',
+          order: 4,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'de_a1_nominativ_akkusativ',
+          title: 'Nominativ und Akkusativ',
+          titlePl: 'Mianownik i Biernik',
+          description: 'Die ersten zwei Fälle',
+          descriptionPl: 'Pierwsze dwa przypadki',
+          order: 5,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'de_a1_negation',
+          title: 'Negation mit "nicht" und "kein"',
+          titlePl: 'Przeczenie z "nicht" i "kein"',
+          description: 'Wie man Sätze verneint',
+          descriptionPl: 'Jak zaprzeczać zdaniom',
+          order: 6,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'de_a1_modalverben_basic',
+          title: 'Modalverben (können, müssen, wollen)',
+          titlePl: 'Czasowniki modalne (können, müssen, wollen)',
+          description: 'Fähigkeit, Notwendigkeit, Wunsch',
+          descriptionPl: 'Umiejętność, konieczność, chęć',
+          order: 7,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'de_a1_wortstellung',
+          title: 'Wortstellung im Hauptsatz',
+          titlePl: 'Szyk wyrazów w zdaniu głównym',
+          description: 'Das Verb steht an Position 2',
+          descriptionPl: 'Czasownik stoi na drugiej pozycji',
+          order: 8,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'de_a1_fragewörter',
+          title: 'W-Fragen',
+          titlePl: 'Pytania z zaimkiem pytającym',
+          description: 'Wer, was, wo, wann, wie, warum',
+          descriptionPl: 'Wer, was, wo, wann, wie, warum',
+          order: 9,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'de_a1_possessivpronomen',
+          title: 'Possessivpronomen',
+          titlePl: 'Zaimki dzierżawcze',
+          description: 'Mein, dein, sein, ihr, unser, euer',
+          descriptionPl: 'Mój, twój, jego, jej, nasz, wasz',
+          order: 10,
+          estimatedMinutes: 25,
+        },
+      ],
+    },
+    {
+      level: 'A2',
+      modules: [
+        {
+          id: 'de_a2_perfekt',
+          title: 'Perfekt',
+          titlePl: 'Czas Perfekt',
+          description: 'Vergangene Ereignisse beschreiben',
+          descriptionPl: 'Opisywanie przeszłych wydarzeń',
+          order: 1,
+          estimatedMinutes: 45,
+        },
+        {
+          id: 'de_a2_dativ',
+          title: 'Dativ',
+          titlePl: 'Celownik',
+          description: 'Der dritte Fall',
+          descriptionPl: 'Trzeci przypadek',
+          order: 2,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'de_a2_praeteritum_sein_haben',
+          title: 'Präteritum von sein und haben',
+          titlePl: 'Czas przeszły sein i haben',
+          description: 'War, hatte',
+          descriptionPl: 'War, hatte',
+          order: 3,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'de_a2_trennbare_verben',
+          title: 'Trennbare Verben',
+          titlePl: 'Czasowniki rozdzielnie złożone',
+          description: 'Aufstehen, ankommen, einkaufen',
+          descriptionPl: 'Aufstehen, ankommen, einkaufen',
+          order: 4,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'de_a2_reflexive_verben',
+          title: 'Reflexive Verben',
+          titlePl: 'Czasowniki zwrotne',
+          description: 'Sich waschen, sich freuen',
+          descriptionPl: 'Sich waschen, sich freuen',
+          order: 5,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'de_a2_praepositionen',
+          title: 'Präpositionen mit Akkusativ und Dativ',
+          titlePl: 'Przyimki z biernikiem i celownikiem',
+          description: 'Für, ohne, mit, bei, nach, zu',
+          descriptionPl: 'Für, ohne, mit, bei, nach, zu',
+          order: 6,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'de_a2_komparativ_superlativ',
+          title: 'Komparativ und Superlativ',
+          titlePl: 'Stopniowanie przymiotników',
+          description: 'Größer, am größten',
+          descriptionPl: 'Większy, największy',
+          order: 7,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'de_a2_nebensaetze_weil_dass',
+          title: 'Nebensätze mit "weil" und "dass"',
+          titlePl: 'Zdania podrzędne z "weil" i "dass"',
+          description: 'Konjunktionen und Wortstellung',
+          descriptionPl: 'Spójniki i szyk wyrazów',
+          order: 8,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'de_a2_imperativ',
+          title: 'Imperativ',
+          titlePl: 'Tryb rozkazujący',
+          description: 'Befehle und Bitten',
+          descriptionPl: 'Rozkazy i prośby',
+          order: 9,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'de_a2_adjektivdeklination',
+          title: 'Adjektivdeklination (Einführung)',
+          titlePl: 'Odmiana przymiotników (wprowadzenie)',
+          description: 'Adjektive vor Nomen',
+          descriptionPl: 'Przymiotniki przed rzeczownikami',
+          order: 10,
+          estimatedMinutes: 40,
+        },
+      ],
+    },
+  ],
+}
+
+// Hiszpański
+const spanishGrammar: LanguageGrammar = {
+  language: 'es',
+  languageName: 'Hiszpański',
+  levels: [
+    {
+      level: 'A1',
+      modules: [
+        {
+          id: 'es_a1_ser_estar',
+          title: 'Verbos "ser" y "estar"',
+          titlePl: 'Czasowniki "ser" i "estar"',
+          description: 'Dos verbos para "być"',
+          descriptionPl: 'Dwa czasowniki oznaczające "być"',
+          order: 1,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'es_a1_articulos',
+          title: 'Artículos definidos e indefinidos',
+          titlePl: 'Rodzajniki określone i nieokreślone',
+          description: 'El, la, los, las / un, una, unos, unas',
+          descriptionPl: 'El, la, los, las / un, una, unos, unas',
+          order: 2,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'es_a1_presente',
+          title: 'Presente de indicativo',
+          titlePl: 'Czas teraźniejszy',
+          description: 'Verbos regulares (-ar, -er, -ir)',
+          descriptionPl: 'Czasowniki regularne (-ar, -er, -ir)',
+          order: 3,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'es_a1_genero_numero',
+          title: 'Género y número',
+          titlePl: 'Rodzaj i liczba',
+          description: 'Masculino/femenino, singular/plural',
+          descriptionPl: 'Męski/żeński, pojedyncza/mnoga',
+          order: 4,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'es_a1_pronombres_personales',
+          title: 'Pronombres personales',
+          titlePl: 'Zaimki osobowe',
+          description: 'Yo, tú, él, ella, nosotros, vosotros, ellos',
+          descriptionPl: 'Yo, tú, él, ella, nosotros, vosotros, ellos',
+          order: 5,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'es_a1_verbos_irregulares_basicos',
+          title: 'Verbos irregulares básicos',
+          titlePl: 'Podstawowe czasowniki nieregularne',
+          description: 'Ir, tener, hacer, poder, querer',
+          descriptionPl: 'Ir, tener, hacer, poder, querer',
+          order: 6,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'es_a1_posesivos',
+          title: 'Posesivos',
+          titlePl: 'Zaimki dzierżawcze',
+          description: 'Mi, tu, su, nuestro, vuestro',
+          descriptionPl: 'Mój, twój, jego/jej, nasz, wasz',
+          order: 7,
+          estimatedMinutes: 20,
+        },
+        {
+          id: 'es_a1_hay',
+          title: 'Hay (haber impersonal)',
+          titlePl: 'Hay (być bezosobowe)',
+          description: 'Expresar existencia',
+          descriptionPl: 'Wyrażanie istnienia',
+          order: 8,
+          estimatedMinutes: 15,
+        },
+        {
+          id: 'es_a1_gustar',
+          title: 'Verbo gustar',
+          titlePl: 'Czasownik gustar',
+          description: 'Me gusta, te gusta, le gusta',
+          descriptionPl: 'Lubię, lubisz, lubi',
+          order: 9,
+          estimatedMinutes: 25,
+        },
+        {
+          id: 'es_a1_preposiciones_lugar',
+          title: 'Preposiciones de lugar',
+          titlePl: 'Przyimki miejsca',
+          description: 'En, sobre, debajo, al lado de',
+          descriptionPl: 'W, na, pod, obok',
+          order: 10,
+          estimatedMinutes: 20,
+        },
+      ],
+    },
+    {
+      level: 'A2',
+      modules: [
+        {
+          id: 'es_a2_preterito_indefinido',
+          title: 'Pretérito indefinido',
+          titlePl: 'Czas przeszły dokonany',
+          description: 'Acciones terminadas en el pasado',
+          descriptionPl: 'Zakończone czynności w przeszłości',
+          order: 1,
+          estimatedMinutes: 45,
+        },
+        {
+          id: 'es_a2_preterito_imperfecto',
+          title: 'Pretérito imperfecto',
+          titlePl: 'Czas przeszły niedokonany',
+          description: 'Descripciones y hábitos en el pasado',
+          descriptionPl: 'Opisy i nawyki w przeszłości',
+          order: 2,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'es_a2_futuro_simple',
+          title: 'Futuro simple',
+          titlePl: 'Czas przyszły prosty',
+          description: 'Hablar del futuro',
+          descriptionPl: 'Mówienie o przyszłości',
+          order: 3,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'es_a2_pronombres_objeto',
+          title: 'Pronombres de objeto directo e indirecto',
+          titlePl: 'Zaimki dopełnienia bliższego i dalszego',
+          description: 'Lo, la, le, los, las, les',
+          descriptionPl: 'Lo, la, le, los, las, les',
+          order: 4,
+          estimatedMinutes: 40,
+        },
+        {
+          id: 'es_a2_reflexivos',
+          title: 'Verbos reflexivos',
+          titlePl: 'Czasowniki zwrotne',
+          description: 'Levantarse, ducharse, vestirse',
+          descriptionPl: 'Wstawać, brać prysznic, ubierać się',
+          order: 5,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'es_a2_comparativos',
+          title: 'Comparativos y superlativos',
+          titlePl: 'Stopniowanie przymiotników',
+          description: 'Más...que, menos...que, el más...',
+          descriptionPl: 'Bardziej niż, mniej niż, najbardziej...',
+          order: 6,
+          estimatedMinutes: 30,
+        },
+        {
+          id: 'es_a2_imperativo',
+          title: 'Imperativo',
+          titlePl: 'Tryb rozkazujący',
+          description: 'Dar órdenes y consejos',
+          descriptionPl: 'Wydawanie rozkazów i rad',
+          order: 7,
+          estimatedMinutes: 35,
+        },
+        {
+          id: 'es_a2_condicional',
+          title: 'Condicional simple',
+          titlePl: 'Tryb warunkowy prosty',
+          description: 'Peticiones corteses y deseos',
+          descriptionPl: 'Uprzejme prośby i życzenia',
+          order: 8,
+          estimatedMinutes: 30,
+        },
+      ],
+    },
+  ],
+}
+
+// Eksportuj wszystkie gramatyki
+export const allGrammars: LanguageGrammar[] = [
+  englishGrammar,
+  germanGrammar,
+  spanishGrammar,
+]
+
+// Funkcje pomocnicze
+export function getGrammarByLanguage(language: string): LanguageGrammar | undefined {
+  return allGrammars.find(g => g.language === language)
+}
+
+export function getModuleById(moduleId: string): { grammar: LanguageGrammar, level: GrammarLevel, module: GrammarModule } | undefined {
+  for (const grammar of allGrammars) {
+    for (const level of grammar.levels) {
+      const module = level.modules.find(m => m.id === moduleId)
+      if (module) {
+        return { grammar, level, module }
+      }
+    }
+  }
+  return undefined
+}
+
+export function getModulesForLanguageAndLevel(language: string, level: string): GrammarModule[] {
+  const grammar = getGrammarByLanguage(language)
+  if (!grammar) return []
+
+  const levelData = grammar.levels.find(l => l.level === level)
+  return levelData?.modules || []
+}
+
+// Języki z gramatyką
+export const languagesWithGrammar = allGrammars.map(g => ({
+  code: g.language,
+  name: g.languageName,
+  levels: g.levels.map(l => l.level),
+}))

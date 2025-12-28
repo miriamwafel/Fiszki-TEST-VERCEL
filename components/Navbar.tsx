@@ -30,6 +30,7 @@ export function Navbar() {
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/stories', label: 'Historyjki' },
     { href: '/sets', label: 'Zestawy' },
+    { href: '/grammar', label: 'Gramatyka' },
     { href: '/exercises', label: 'Ćwiczenia' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', admin: true }] : []),
   ]

@@ -17,10 +17,12 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  sets          FlashcardSet[]
-  stories       Story[]
-  practiceStats PracticeStats[]
-  settings      UserSettings?
+  sets              FlashcardSet[]
+  stories           Story[]
+  practiceStats     PracticeStats[]
+  settings          UserSettings?
+  grammarProgress   UserGrammarProgress[]
+  grammarReviews    GrammarReviewSchedule[]
 }
 
 // Ustawienia użytkownika (domyślne dni powtórek itp.)
@@ -120,4 +122,57 @@ model PracticeStats {
   @@unique([userId, flashcardId])
   @@index([userId])
   @@index([flashcardId])
+}
+
+// Postęp użytkownika w modułach gramatycznych
+model UserGrammarProgress {
+  id              String    @id @default(cuid())
+  moduleId        String    // ID modułu z predefiniowanej listy (np. "en_a1_present_simple")
+  language        String    // en, de, es, etc.
+  level           String    // A1, A2, B1, B2, C1, C2
+
+  // Treść wygenerowana przez AI (teoria + przykłady)
+  generatedContent String?  @db.Text
+
+  // Status
+  started         Boolean   @default(false)
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+
+  // Statystyki ćwiczeń
+  exercisesDone   Int       @default(0)
+  exercisesCorrect Int      @default(0)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  reviews         GrammarReviewSchedule[]
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+  @@index([language])
+}
+
+// Harmonogram powtórek gramatycznych
+model GrammarReviewSchedule {
+  id              String    @id @default(cuid())
+  scheduledDate   DateTime
+  dayOffset       Int       // +1, +5, +15, +35, +90
+  completed       Boolean   @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+
+  progressId      String
+  progress        UserGrammarProgress @relation(fields: [progressId], references: [id], onDelete: Cascade)
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([progressId])
+  @@index([userId])
+  @@index([scheduledDate])
 }
