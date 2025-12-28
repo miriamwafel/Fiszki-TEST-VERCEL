@@ -22,6 +22,8 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDate, setEditDate] = useState('')
 
   useEffect(() => {
     fetchReviews()
@@ -79,6 +81,50 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     } catch (error) {
       console.error('Failed to mark review as completed:', error)
     }
+  }
+
+  const updateReviewDate = async (reviewId: string) => {
+    if (!editDate) return
+
+    try {
+      const response = await fetch(`/api/sets/${setId}/reviews`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewId, scheduledDate: editDate }),
+      })
+
+      if (response.ok) {
+        const updated = await response.json()
+        setReviews(reviews.map(r =>
+          r.id === reviewId ? { ...r, scheduledDate: updated.scheduledDate } : r
+        ))
+        setEditingId(null)
+        setEditDate('')
+      }
+    } catch (error) {
+      console.error('Failed to update review date:', error)
+    }
+  }
+
+  const deleteReview = async (reviewId: string) => {
+    if (!confirm('Czy na pewno chcesz usunąć tę powtórkę?')) return
+
+    try {
+      const response = await fetch(`/api/sets/${setId}/reviews?reviewId=${reviewId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setReviews(reviews.filter(r => r.id !== reviewId))
+      }
+    } catch (error) {
+      console.error('Failed to delete review:', error)
+    }
+  }
+
+  const startEditing = (review: Review) => {
+    setEditingId(review.id)
+    setEditDate(review.scheduledDate.split('T')[0])
   }
 
   const formatDate = (dateString: string) => {
@@ -228,13 +274,13 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                   : 'bg-blue-50'
               }`}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1">
                 {review.completed ? (
-                  <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
-                  <div className={`w-5 h-5 rounded-full border-2 ${
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 ${
                     isOverdue(review.scheduledDate)
                       ? 'border-red-400'
                       : isToday(review.scheduledDate)
@@ -242,35 +288,112 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                       : 'border-blue-400'
                   }`} />
                 )}
-                <div>
-                  <span className={`text-sm font-medium ${
-                    review.completed
-                      ? 'line-through text-gray-400'
-                      : isOverdue(review.scheduledDate)
-                      ? 'text-red-700'
-                      : isToday(review.scheduledDate)
-                      ? 'text-green-700'
-                      : 'text-blue-700'
-                  }`}>
-                    {formatDate(review.scheduledDate)}
-                  </span>
-                  <span className="text-xs text-gray-500 ml-2">
-                    (+{review.dayOffset} {review.dayOffset === 1 ? 'dzień' : 'dni'})
-                  </span>
-                </div>
+
+                {editingId === review.id ? (
+                  <div className="flex items-center gap-2 flex-1">
+                    <input
+                      type="date"
+                      value={editDate}
+                      onChange={(e) => setEditDate(e.target.value)}
+                      className="text-sm border rounded px-2 py-1"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        updateReviewDate(review.id)
+                      }}
+                      className="text-green-600 hover:text-green-700"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setEditingId(null)
+                        setEditDate('')
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex-1">
+                    <span className={`text-sm font-medium ${
+                      review.completed
+                        ? 'line-through text-gray-400'
+                        : isOverdue(review.scheduledDate)
+                        ? 'text-red-700'
+                        : isToday(review.scheduledDate)
+                        ? 'text-green-700'
+                        : 'text-blue-700'
+                    }`}>
+                      {formatDate(review.scheduledDate)}
+                    </span>
+                    <span className="text-xs text-gray-500 ml-2">
+                      (+{review.dayOffset} {review.dayOffset === 1 ? 'dzień' : 'dni'})
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {!review.completed && (
-                <Button
-                  variant="secondary"
+              {!review.completed && editingId !== review.id && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      startEditing(review)
+                    }}
+                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                    title="Edytuj datę"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteReview(review.id)
+                    }}
+                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                    title="Usuń powtórkę"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                  <Button
+                    variant="secondary"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      markCompleted(review.id)
+                    }}
+                    className="text-xs py-1 px-2 ml-1"
+                  >
+                    Ukończ
+                  </Button>
+                </div>
+              )}
+
+              {review.completed && (
+                <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    markCompleted(review.id)
+                    deleteReview(review.id)
                   }}
-                  className="text-xs py-1 px-2"
+                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                  title="Usuń powtórkę"
                 >
-                  Ukończ
-                </Button>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
               )}
             </div>
           ))}

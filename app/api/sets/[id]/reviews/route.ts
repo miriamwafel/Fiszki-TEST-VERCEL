@@ -70,10 +70,13 @@ export async function POST(
       days = (settings?.defaultReviewDays as number[]) || [1, 5, 15, 35, 90]
     }
 
-    // Pobierz wszystkie istniejące powtórki użytkownika (do sprawdzenia obłożenia)
+    // Pobierz wszystkie istniejące powtórki użytkownika DLA TEGO SAMEGO JĘZYKA (do sprawdzenia obłożenia)
     const existingReviews = await prisma.reviewSchedule.findMany({
       where: {
-        set: { userId: session.user.id },
+        set: {
+          userId: session.user.id,
+          language: set.language, // Tylko zestawy w tym samym języku
+        },
         completed: false,
       },
       select: { scheduledDate: true },
@@ -218,6 +221,50 @@ export async function PUT(
     return NextResponse.json(updatedReview)
   } catch (error) {
     console.error('Update review error:', error)
+    return NextResponse.json({ error: 'Wystąpił błąd' }, { status: 500 })
+  }
+}
+
+// DELETE - usuń pojedynczą powtórkę
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    const { id: setId } = await params
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { searchParams } = new URL(request.url)
+    const reviewId = searchParams.get('reviewId')
+
+    if (!reviewId) {
+      return NextResponse.json({ error: 'reviewId jest wymagane' }, { status: 400 })
+    }
+
+    // Sprawdź czy powtórka należy do zestawu użytkownika
+    const review = await prisma.reviewSchedule.findFirst({
+      where: {
+        id: reviewId,
+        setId,
+        set: { userId: session.user.id },
+      },
+    })
+
+    if (!review) {
+      return NextResponse.json({ error: 'Powtórka nie znaleziona' }, { status: 404 })
+    }
+
+    await prisma.reviewSchedule.delete({
+      where: { id: reviewId },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete review error:', error)
     return NextResponse.json({ error: 'Wystąpił błąd' }, { status: 500 })
   }
 }
