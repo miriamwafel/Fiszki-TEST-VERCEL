@@ -7,6 +7,12 @@ import { Button } from '@/components/Button'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
+import {
+  getCachedTranslation,
+  setCachedTranslation,
+  invalidateFlashcardsCache,
+  type CachedTranslation,
+} from '@/lib/cache'
 
 const translationMessages = [
   'AI analizuje słowo...',
@@ -95,6 +101,22 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
     e.preventDefault()
     if (!word.trim()) return
 
+    const trimmedWord = word.trim()
+
+    // 1. Sprawdź cache najpierw (instant!)
+    const cached = await getCachedTranslation(trimmedWord, set.language)
+    if (cached) {
+      setTranslationResult({
+        word: cached.word,
+        translation: cached.translation,
+        partOfSpeech: cached.partOfSpeech || '',
+        infinitive: cached.infinitive,
+        hasMultipleMeanings: false,
+      })
+      return
+    }
+
+    // 2. Nie ma w cache - pytaj AI
     setLoading(true)
     setTranslationResult(null)
 
@@ -102,7 +124,7 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
       const response = await fetch('/api/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ word: word.trim(), language: set.language }),
+        body: JSON.stringify({ word: trimmedWord, language: set.language }),
       })
 
       const data = await response.json()
@@ -110,6 +132,17 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
       if (!response.ok) {
         throw new Error(data.error)
       }
+
+      // 3. Zapisz do cache
+      const translationToCache: CachedTranslation = {
+        word: trimmedWord,
+        translation: data.translation,
+        partOfSpeech: data.partOfSpeech,
+        infinitive: data.infinitive,
+        infinitiveTranslation: data.infinitiveTranslation,
+        language: set.language,
+      }
+      await setCachedTranslation(translationToCache)
 
       setTranslationResult(data)
     } catch (error) {

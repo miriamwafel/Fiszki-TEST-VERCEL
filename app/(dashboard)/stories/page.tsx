@@ -7,6 +7,15 @@ import { Select } from '@/components/Select'
 import { Input } from '@/components/Input'
 import { Card } from '@/components/Card'
 import { Modal } from '@/components/Modal'
+import {
+  getCachedStories,
+  setCachedStories,
+  getCachedTranslation,
+  setCachedTranslation,
+  getCachedSets,
+  setCachedSets,
+  type CachedTranslation,
+} from '@/lib/cache'
 
 // Loading messages for AI generation
 const storyLoadingMessages = [
@@ -185,9 +194,20 @@ export default function StoriesPage() {
 
   const fetchStories = async () => {
     try {
+      // 1. Sprawdź cache najpierw (instant!)
+      const cached = await getCachedStories()
+      if (cached && cached.length > 0) {
+        setStories(cached as Story[])
+        setLoading(false)
+      }
+
+      // 2. Fetch z serwera (revalidate)
       const response = await fetch('/api/stories')
       const data = await response.json()
       setStories(data)
+
+      // 3. Zapisz do cache
+      await setCachedStories(data)
     } catch (error) {
       console.error('Failed to fetch stories:', error)
     } finally {
@@ -197,9 +217,19 @@ export default function StoriesPage() {
 
   const fetchSets = async () => {
     try {
+      // 1. Sprawdź cache najpierw
+      const cached = await getCachedSets()
+      if (cached && cached.length > 0) {
+        setSets(cached as FlashcardSet[])
+      }
+
+      // 2. Fetch z serwera
       const response = await fetch('/api/sets')
       const data = await response.json()
       setSets(data)
+
+      // 3. Zapisz do cache
+      await setCachedSets(data)
     } catch (error) {
       console.error('Failed to fetch sets:', error)
     }
@@ -262,6 +292,24 @@ export default function StoriesPage() {
       ? getSentenceContext(selectedStory.content, cleanWord)
       : ''
 
+    const storyLanguage = selectedStory?.language || language
+
+    // 1. Sprawdź cache tłumaczeń NAJPIERW (instant!)
+    const cached = await getCachedTranslation(cleanWord, storyLanguage, sentenceContext)
+    if (cached) {
+      // Mamy w cache - pokaż od razu bez loadingu!
+      setWordModal({
+        word: cleanWord,
+        translation: cached.translation,
+        partOfSpeech: cached.partOfSpeech,
+        context: sentenceContext,
+        infinitive: cached.infinitive,
+        infinitiveTranslation: cached.infinitiveTranslation,
+      })
+      return
+    }
+
+    // 2. Nie ma w cache - pytaj AI
     setTranslatingWord(true)
     try {
       const response = await fetch('/api/translate-word', {
@@ -269,9 +317,9 @@ export default function StoriesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           word: cleanWord,
-          fromLanguage: selectedStory?.language || language,
+          fromLanguage: storyLanguage,
           sentenceContext,
-          storyId: selectedStory?.id, // Przekaż storyId dla cache
+          storyId: selectedStory?.id,
         }),
       })
 
@@ -280,6 +328,18 @@ export default function StoriesPage() {
       if (!response.ok) {
         throw new Error(data.error)
       }
+
+      // 3. Zapisz do cache na przyszłość
+      const translationToCache: CachedTranslation = {
+        word: cleanWord,
+        translation: data.translation,
+        partOfSpeech: data.partOfSpeech,
+        infinitive: data.infinitive,
+        infinitiveTranslation: data.infinitiveTranslation,
+        language: storyLanguage,
+        context: sentenceContext,
+      }
+      await setCachedTranslation(translationToCache)
 
       setWordModal({
         word: cleanWord,
