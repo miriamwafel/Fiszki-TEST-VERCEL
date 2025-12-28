@@ -555,17 +555,17 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                 {!aiExplanation && !loadingExplanation && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
                     {!showAskInput ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <button
                           onClick={() => requestExplanation()}
-                          className="flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium"
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 transition-all text-sm font-medium shadow-sm"
                         >
                           <span>🤖</span>
                           Wyjaśnij mi to
                         </button>
                         <button
                           onClick={() => setShowAskInput(true)}
-                          className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
                         >
                           <span>❓</span>
                           Mam pytanie
@@ -573,33 +573,33 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <p className="text-sm text-gray-600">Zadaj pytanie dotyczące tego ćwiczenia:</p>
                         <input
                           type="text"
                           value={customQuestion}
                           onChange={(e) => setCustomQuestion(e.target.value)}
-                          placeholder="Np. Dlaczego nie można użyć 'have' zamiast 'has'?"
-                          className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="Np. Dlaczego użyto tej formy?"
+                          className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && customQuestion.trim()) {
                               requestExplanation(customQuestion)
                             }
                           }}
+                          autoFocus
                         />
                         <div className="flex gap-2">
                           <button
                             onClick={() => requestExplanation(customQuestion)}
                             disabled={!customQuestion.trim()}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium disabled:opacity-50"
+                            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg hover:from-purple-600 hover:to-indigo-600 transition-all text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Zapytaj AI
+                            Zapytaj
                           </button>
                           <button
                             onClick={() => {
                               setShowAskInput(false)
                               setCustomQuestion('')
                             }}
-                            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                            className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors text-sm"
                           >
                             Anuluj
                           </button>
@@ -625,24 +625,39 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                 {/* AI Explanation Display */}
                 {aiExplanation && (
                   <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xl">🤖</span>
-                        <span className="font-bold text-purple-800">Wyjaśnienie AI</span>
-                      </div>
-                      <div className="prose prose-sm max-w-none text-gray-700">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {aiExplanation}
-                        </ReactMarkdown>
+                    <div className="bg-white rounded-xl border border-purple-200 shadow-sm overflow-hidden">
+                      {/* Header */}
+                      <div className="bg-gradient-to-r from-purple-500 to-indigo-500 px-4 py-2.5 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white/90">🤖</span>
+                          <span className="font-semibold text-white text-sm">Wyjaśnienie AI</span>
+                        </div>
+                        <button
+                          onClick={() => setAiExplanation('')}
+                          className="text-white/70 hover:text-white transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
 
-                      {/* Add to Theory Button */}
-                      <div className="mt-4 pt-3 border-t border-purple-200 flex items-center justify-between">
+                      {/* Content */}
+                      <div className="p-4 sm:p-5">
+                        <div className="ai-explanation-content text-gray-700 text-sm sm:text-base leading-relaxed">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {aiExplanation}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+
+                      {/* Footer */}
+                      <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
                         {!addedToTheory ? (
                           <button
                             onClick={addExplanationToTheory}
                             disabled={addingToTheory}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium disabled:opacity-50"
+                            className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-sm font-medium disabled:opacity-50"
                           >
                             {addingToTheory ? (
                               <>
@@ -650,29 +665,25 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
-                                Dodawanie...
+                                Zapisywanie...
                               </>
                             ) : (
                               <>
-                                <span>📝</span>
-                                Dodaj do mojej teorii
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                </svg>
+                                Zapisz do notatek
                               </>
                             )}
                           </button>
                         ) : (
                           <div className="flex items-center gap-2 text-green-600 text-sm font-medium">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                            Dodano do teorii!
+                            Zapisano!
                           </div>
                         )}
-                        <button
-                          onClick={() => setAiExplanation('')}
-                          className="text-sm text-gray-500 hover:text-gray-700"
-                        >
-                          Zamknij
-                        </button>
                       </div>
                     </div>
                   </div>

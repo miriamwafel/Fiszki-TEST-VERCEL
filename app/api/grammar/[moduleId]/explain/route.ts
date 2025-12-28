@@ -39,30 +39,32 @@ export async function POST(
 
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' })
 
-    const prompt = `Jesteś nauczycielem języka ${langName}. Użytkownik robi ćwiczenie gramatyczne i potrzebuje wyjaśnienia.
+    const prompt = `Jesteś ekspertem od języka ${langName}. Wyjaśnij KRÓTKO i KONKRETNIE.
 
-**KONTEKST:**
-- Temat gramatyczny: ${moduleData.module.titlePl}
-- Poziom: ${moduleData.level.level}
-- Typ ćwiczenia: ${exerciseType}
+📌 **Ćwiczenie:** ${sentence}
+✅ **Odpowiedź:** ${answer}
+${userAnswer && userAnswer !== answer ? `❌ **Twoja odpowiedź:** ${userAnswer}` : ''}
 
-**ĆWICZENIE:**
-- Zdanie/pytanie: ${sentence}
-- Poprawna odpowiedź: ${answer}
-${userAnswer ? `- Odpowiedź użytkownika: ${userAnswer}` : ''}
+${question ? `❓ **Pytanie:** ${question}` : ''}
 
-${question ? `**PYTANIE UŻYTKOWNIKA:** ${question}` : '**ZADANIE:** Wyjaśnij dlaczego poprawna odpowiedź jest taka, a nie inna.'}
+**FORMAT ODPOWIEDZI (ŚCIŚLE PRZESTRZEGAJ):**
 
-**WYMAGANIA ODPOWIEDZI:**
-1. Wyjaśnij KONKRETNIE ten przypadek (nie ogólnie)
-2. Jeśli użytkownik popełnił błąd, wyjaśnij dlaczego jego odpowiedź jest niepoprawna
-3. Podaj regułę gramatyczną, która tu obowiązuje
-4. Daj 2-3 podobne przykłady dla utrwalenia
-5. Użyj emoji dla czytelności (✓, ✗, 💡, ⚠️)
-6. Pisz zwięźle ale wyczerpująco
-7. Format: Markdown z tabelkami jeśli potrzeba
+${userAnswer && userAnswer !== answer ? `**Twój błąd:** [1 zdanie - co było źle]
 
-**ODPOWIEDŹ:**`
+` : ''}**Dlaczego "${answer}":** [1-2 zdania - konkretne wyjaśnienie]
+
+**Reguła:** [1 zdanie - zasada gramatyczna]
+
+**Przykłady:**
+- ✅ [przykład poprawny]
+- ✅ [przykład poprawny]
+${userAnswer && userAnswer !== answer ? `- ❌ [przykład błędny - podobny do błędu użytkownika]` : ''}
+
+**ZASADY:**
+- MAX 100 słów całość
+- ZERO wstępów typu "Jasne!", "Rozumiem"
+- Konkret, nie teoria
+- Proste zdania`
 
     const result = await model.generateContent(prompt)
     const explanation = result.response.text()
