@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { getModuleById } from '@/lib/grammar-modules'
 
 // GET - pobierz wszystkie zaplanowane powtórki użytkownika (do kalendarza)
 export async function GET(request: Request) {
@@ -23,7 +24,8 @@ export async function GET(request: Request) {
     fromDate.setHours(0, 0, 0, 0)
     toDate.setHours(23, 59, 59, 999)
 
-    const reviews = await prisma.reviewSchedule.findMany({
+    // Pobierz powtórki zestawów fiszek
+    const setReviews = await prisma.reviewSchedule.findMany({
       where: {
         set: { userId: session.user.id },
         scheduledDate: {
@@ -44,10 +46,66 @@ export async function GET(request: Request) {
       orderBy: { scheduledDate: 'asc' },
     })
 
+    // Pobierz powtórki gramatyczne
+    const grammarReviews = await prisma.grammarReviewSchedule.findMany({
+      where: {
+        userId: session.user.id,
+        scheduledDate: {
+          gte: fromDate,
+          lte: toDate,
+        },
+      },
+      include: {
+        progress: {
+          select: {
+            moduleId: true,
+            language: true,
+            level: true,
+          },
+        },
+      },
+      orderBy: { scheduledDate: 'asc' },
+    })
+
+    // Przekształć powtórki gramatyczne do wspólnego formatu
+    const formattedGrammarReviews = grammarReviews.map(review => {
+      const moduleData = getModuleById(review.progress.moduleId)
+      return {
+        id: review.id,
+        scheduledDate: review.scheduledDate,
+        dayOffset: review.dayOffset,
+        completed: review.completed,
+        completedAt: review.completedAt,
+        createdAt: review.createdAt,
+        type: 'grammar' as const,
+        moduleId: review.progress.moduleId,
+        moduleName: moduleData?.module.titlePl || 'Moduł gramatyczny',
+        language: review.progress.language,
+        level: review.progress.level,
+      }
+    })
+
+    // Przekształć powtórki zestawów
+    const formattedSetReviews = setReviews.map(review => ({
+      id: review.id,
+      scheduledDate: review.scheduledDate,
+      dayOffset: review.dayOffset,
+      completed: review.completed,
+      completedAt: review.completedAt,
+      createdAt: review.createdAt,
+      type: 'set' as const,
+      setId: review.set.id,
+      set: review.set,
+    }))
+
+    // Połącz wszystkie powtórki
+    const allReviews = [...formattedSetReviews, ...formattedGrammarReviews]
+      .sort((a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime())
+
     // Grupuj po dacie
-    const groupedByDate: Record<string, typeof reviews> = {}
-    for (const review of reviews) {
-      const dateKey = review.scheduledDate.toISOString().split('T')[0]
+    const groupedByDate: Record<string, typeof allReviews> = {}
+    for (const review of allReviews) {
+      const dateKey = new Date(review.scheduledDate).toISOString().split('T')[0]
       if (!groupedByDate[dateKey]) {
         groupedByDate[dateKey] = []
       }
@@ -61,7 +119,7 @@ export async function GET(request: Request) {
     }
 
     return NextResponse.json({
-      reviews,
+      reviews: allReviews,
       groupedByDate,
       reviewCounts,
     })

@@ -4,11 +4,13 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
 
-interface ReviewItem {
+interface SetReviewItem {
   id: string
   scheduledDate: string
   dayOffset: number
   completed: boolean
+  type: 'set'
+  setId: string
   set: {
     id: string
     name: string
@@ -16,6 +18,20 @@ interface ReviewItem {
     _count: { flashcards: number }
   }
 }
+
+interface GrammarReviewItem {
+  id: string
+  scheduledDate: string
+  dayOffset: number
+  completed: boolean
+  type: 'grammar'
+  moduleId: string
+  moduleName: string
+  language: string
+  level: string
+}
+
+type ReviewItem = SetReviewItem | GrammarReviewItem
 
 const languageNames: Record<string, string> = {
   en: 'Angielski',
@@ -113,13 +129,57 @@ export function ReviewCalendar() {
   const groupReviewsByLanguage = (reviewsToGroup: ReviewItem[]) => {
     const byLanguage: Record<string, ReviewItem[]> = {}
     for (const review of reviewsToGroup) {
-      const lang = review.set.language
+      const lang = review.type === 'set' ? review.set.language : review.language
       if (!byLanguage[lang]) {
         byLanguage[lang] = []
       }
       byLanguage[lang].push(review)
     }
     return byLanguage
+  }
+
+  // Helper do pobierania linku
+  const getReviewLink = (review: ReviewItem) => {
+    if (review.type === 'grammar') {
+      return `/grammar/${review.moduleId}`
+    }
+    return `/sets/${review.set.id}`
+  }
+
+  // Helper do pobierania nazwy
+  const getReviewName = (review: ReviewItem) => {
+    if (review.type === 'grammar') {
+      return review.moduleName
+    }
+    return review.set.name
+  }
+
+  // Helper do pobierania opisu
+  const getReviewDescription = (review: ReviewItem, isOverdue: boolean) => {
+    if (review.type === 'grammar') {
+      const desc = `Gramatyka ${review.level}`
+      if (isOverdue) {
+        return (
+          <>
+            {desc}
+            <span className="text-red-600 ml-2">
+              · {new Date(review.scheduledDate).toLocaleDateString('pl-PL')}
+            </span>
+          </>
+        )
+      }
+      return desc
+    }
+    return (
+      <>
+        {review.set._count.flashcards} fiszek
+        {isOverdue && (
+          <span className="text-red-600 ml-2">
+            · {new Date(review.scheduledDate).toLocaleDateString('pl-PL')}
+          </span>
+        )}
+      </>
+    )
   }
 
   const formatDayName = (date: Date) => {
@@ -158,11 +218,16 @@ export function ReviewCalendar() {
           <div>
             <h3 className="font-medium text-gray-900">Brak zaplanowanych powtórek</h3>
             <p className="text-sm text-gray-500 mt-1">
-              Włącz harmonogram powtórek w swoich zestawach, aby śledzić postępy nauki.
+              Włącz harmonogram powtórek w zestawach fiszek lub modułach gramatycznych.
             </p>
-            <Link href="/sets" className="text-sm text-primary-600 hover:underline mt-2 inline-block">
-              Przejdź do zestawów →
-            </Link>
+            <div className="flex gap-3 mt-2">
+              <Link href="/sets" className="text-sm text-primary-600 hover:underline">
+                Zestawy →
+              </Link>
+              <Link href="/grammar" className="text-sm text-purple-600 hover:underline">
+                Gramatyka →
+              </Link>
+            </div>
           </div>
         </div>
       </Card>
@@ -270,38 +335,46 @@ export function ReviewCalendar() {
                 const reviewDate = new Date(review.scheduledDate)
                 reviewDate.setHours(0, 0, 0, 0)
                 const isOverdue = reviewDate < today
+                const isGrammar = review.type === 'grammar'
 
                 return (
                   <Link
                     key={review.id}
-                    href={`/sets/${review.set.id}`}
+                    href={getReviewLink(review)}
                     className={`flex items-center justify-between p-3 rounded-lg transition-colors ${
                       isOverdue
                         ? 'bg-red-50 hover:bg-red-100'
+                        : isGrammar
+                        ? 'bg-purple-50 hover:bg-purple-100'
                         : 'bg-green-50 hover:bg-green-100'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded-full border-2 ${
-                        isOverdue ? 'border-red-400' : 'border-green-400'
-                      }`} />
+                      {isGrammar ? (
+                        <div className={`w-5 h-5 rounded flex items-center justify-center text-xs ${
+                          isOverdue ? 'bg-red-200 text-red-700' : 'bg-purple-200 text-purple-700'
+                        }`}>
+                          G
+                        </div>
+                      ) : (
+                        <div className={`w-5 h-5 rounded-full border-2 ${
+                          isOverdue ? 'border-red-400' : 'border-green-400'
+                        }`} />
+                      )}
                       <div>
                         <p className="font-medium text-sm text-gray-900">
-                          {review.set.name}
+                          {getReviewName(review)}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {review.set._count.flashcards} fiszek
-                          {isOverdue && (
-                            <span className="text-red-600 ml-2">
-                              · {new Date(review.scheduledDate).toLocaleDateString('pl-PL')}
-                            </span>
-                          )}
+                          {getReviewDescription(review, isOverdue)}
                         </p>
                       </div>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded ${
                       isOverdue
                         ? 'bg-red-200 text-red-800'
+                        : isGrammar
+                        ? 'bg-purple-200 text-purple-800'
                         : 'bg-green-200 text-green-800'
                     }`}>
                       {isOverdue ? 'Zaległe' : 'Do zrobienia'}
@@ -320,7 +393,7 @@ export function ReviewCalendar() {
             {reviewsByDate[selectedDate].filter(r => r.completed).map((review) => (
               <Link
                 key={review.id}
-                href={`/sets/${review.set.id}`}
+                href={getReviewLink(review)}
                 className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors mb-2"
               >
                 <div className="flex items-center gap-3">
@@ -329,10 +402,13 @@ export function ReviewCalendar() {
                   </svg>
                   <div>
                     <p className="font-medium text-sm text-gray-500 line-through">
-                      {review.set.name}
+                      {getReviewName(review)}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {languageFlags[review.set.language]} {review.set._count.flashcards} fiszek
+                      {review.type === 'grammar'
+                        ? `${languageFlags[review.language]} Gramatyka ${review.level}`
+                        : `${languageFlags[review.set.language]} ${review.set._count.flashcards} fiszek`
+                      }
                     </p>
                   </div>
                 </div>

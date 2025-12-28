@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
+import { GrammarReviewScheduleManager } from '@/components/GrammarReviewScheduleManager'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -973,90 +974,16 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
                 )}
               </div>
 
-              {progress.completed && reviews.length > 0 && (
-                <div className="text-sm text-gray-500 flex items-center gap-2">
-                  <span>📅</span>
-                  <span className="font-medium">Powtórki zaplanowane</span>
-                </div>
-              )}
             </div>
           </div>
 
           {/* Reviews schedule */}
-          {progress.completed && reviews.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mt-6">
-              <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <span className="text-xl">📅</span>
-                Harmonogram powtórek
-              </h3>
-              <div className="grid gap-3">
-                {reviews.map((review) => {
-                  const date = new Date(review.scheduledDate)
-                  const today = new Date()
-                  today.setHours(0, 0, 0, 0)
-                  const reviewDate = new Date(date)
-                  reviewDate.setHours(0, 0, 0, 0)
-                  const isOverdue = reviewDate < today && !review.completed
-                  const isToday = reviewDate.getTime() === today.getTime()
-
-                  return (
-                    <div
-                      key={review.id}
-                      className={`flex items-center justify-between p-4 rounded-xl transition-all ${
-                        review.completed
-                          ? 'bg-gray-50 border border-gray-200'
-                          : isOverdue
-                          ? 'bg-red-50 border-2 border-red-200'
-                          : isToday
-                          ? 'bg-green-50 border-2 border-green-200'
-                          : 'bg-blue-50 border border-blue-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        {review.completed ? (
-                          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                            <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
-                        ) : (
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                            isOverdue ? 'bg-red-500 text-white' :
-                            isToday ? 'bg-green-500 text-white' :
-                            'bg-blue-500 text-white'
-                          }`}>
-                            +{review.dayOffset}
-                          </div>
-                        )}
-                        <div>
-                          <span className={`font-semibold ${review.completed ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                            {date.toLocaleDateString('pl-PL', {
-                              weekday: 'long',
-                              day: 'numeric',
-                              month: 'long',
-                            })}
-                          </span>
-                          <p className="text-sm text-gray-500">
-                            {review.dayOffset === 1 ? 'Jutro' : `Za ${review.dayOffset} dni od ukończenia`}
-                          </p>
-                        </div>
-                      </div>
-                      {isOverdue && !review.completed && (
-                        <span className="px-3 py-1 bg-red-500 text-white text-xs font-bold rounded-full">
-                          ZALEGŁE
-                        </span>
-                      )}
-                      {isToday && !review.completed && (
-                        <span className="px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full animate-pulse">
-                          DZISIAJ
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          <div className="mt-6">
+            <GrammarReviewScheduleManager
+              moduleId={moduleId}
+              moduleName={module.titlePl}
+            />
+          </div>
         </>
       )}
     </div>
