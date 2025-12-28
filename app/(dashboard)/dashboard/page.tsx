@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { Card } from '@/components/Card'
+import { ReviewCalendar } from '@/components/ReviewCalendar'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -176,6 +177,11 @@ export default async function DashboardPage() {
             </div>
           </div>
         </Card>
+      </div>
+
+      {/* Kalendarz powtórek */}
+      <div className="mb-8">
+        <ReviewCalendar />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

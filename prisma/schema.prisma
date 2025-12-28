@@ -20,6 +20,21 @@ model User {
   sets          FlashcardSet[]
   stories       Story[]
   practiceStats PracticeStats[]
+  settings      UserSettings?
+}
+
+// Ustawienia użytkownika (domyślne dni powtórek itp.)
+model UserSettings {
+  id                  String   @id @default(cuid())
+  // Domyślne dni powtórek (JSON array, np. [1, 5, 15, 35, 90])
+  defaultReviewDays   Json     @default("[1, 5, 15, 35, 90]")
+  // Max powtórek na dzień przed propozycją przesunięcia
+  maxReviewsPerDay    Int      @default(2)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model FlashcardSet {
@@ -34,8 +49,25 @@ model FlashcardSet {
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   flashcards  Flashcard[]
+  reviews     ReviewSchedule[]
 
   @@index([userId])
+}
+
+// Harmonogram powtórek dla zestawu
+model ReviewSchedule {
+  id            String    @id @default(cuid())
+  scheduledDate DateTime  // Data zaplanowanej powtórki
+  dayOffset     Int       // Oryginalny offset (+1, +5, +15, +35, +90)
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  setId         String
+  set           FlashcardSet @relation(fields: [setId], references: [id], onDelete: Cascade)
+
+  @@index([setId])
+  @@index([scheduledDate])
 }
 
 model Flashcard {

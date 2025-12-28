@@ -13,6 +13,7 @@ import {
   invalidateFlashcardsCache,
   type CachedTranslation,
 } from '@/lib/cache'
+import { ReviewScheduleManager } from '@/components/ReviewScheduleManager'
 
 const translationMessages = [
   'AI analizuje słowo...',
@@ -65,6 +66,7 @@ interface FlashcardSet {
   name: string
   description?: string | null
   language: string
+  createdAt: string | Date
   flashcards: Flashcard[]
 }
 
@@ -296,6 +298,15 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
             <p className="text-gray-500 mt-1">{set.description}</p>
           )}
         </div>
+
+        {/* Harmonogram powtórek */}
+        <div className="mb-4">
+          <ReviewScheduleManager
+            setId={set.id}
+            setCreatedAt={typeof set.createdAt === 'string' ? set.createdAt : set.createdAt.toISOString()}
+          />
+        </div>
+
         <div className="flex flex-wrap gap-2 sm:gap-3">
           {set.flashcards.length > 0 && (
             <>
