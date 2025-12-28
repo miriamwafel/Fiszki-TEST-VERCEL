@@ -839,7 +839,7 @@ export default function StoriesPage() {
                       <p className="text-blue-600 text-sm">Historia jest już gotowa - słowniczek pojawi się za chwilę</p>
                     </div>
                   </div>
-                ) : (
+                ) : selectedStory.vocabulary && selectedStory.vocabulary.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {selectedStory.vocabulary.map((item, index) => (
                       <button
@@ -854,7 +854,7 @@ export default function StoriesPage() {
                       </button>
                     ))}
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           ) : (
