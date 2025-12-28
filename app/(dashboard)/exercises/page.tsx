@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/Button'
 import { Select } from '@/components/Select'
 import { Card } from '@/components/Card'
@@ -43,6 +44,46 @@ interface SentenceExercise {
 
 type ExerciseType = 'gap' | 'sentence'
 
+const languageNames: Record<string, string> = {
+  en: 'Angielski',
+  de: 'Niemiecki',
+  es: 'Hiszpański',
+  fr: 'Francuski',
+  it: 'Włoski',
+  pt: 'Portugalski',
+  ru: 'Rosyjski',
+  ja: 'Japoński',
+  ko: 'Koreański',
+  zh: 'Chiński',
+  nl: 'Holenderski',
+  sv: 'Szwedzki',
+  no: 'Norweski',
+  da: 'Duński',
+  fi: 'Fiński',
+  cs: 'Czeski',
+  uk: 'Ukraiński',
+}
+
+const languageFlags: Record<string, string> = {
+  en: '🇬🇧',
+  de: '🇩🇪',
+  es: '🇪🇸',
+  fr: '🇫🇷',
+  it: '🇮🇹',
+  pt: '🇵🇹',
+  ru: '🇷🇺',
+  ja: '🇯🇵',
+  ko: '🇰🇷',
+  zh: '🇨🇳',
+  nl: '🇳🇱',
+  sv: '🇸🇪',
+  no: '🇳🇴',
+  da: '🇩🇰',
+  fi: '🇫🇮',
+  cs: '🇨🇿',
+  uk: '🇺🇦',
+}
+
 // Loading messages for AI generation
 const loadingMessages = [
   'AI tworzy ćwiczenia dla Ciebie...',
@@ -61,16 +102,13 @@ function LoadingSpinner({ message, flashcardsCount = 10 }: { message: string, fl
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
-    // Oblicz czas dla 0-90% na podstawie liczby słówek (1.5s na słówko)
-    const baseTimeMs = flashcardsCount * 1.5 * 1000 // w milisekundach
+    const baseTimeMs = flashcardsCount * 1.5 * 1000
     const startTime = Date.now()
 
-    // Symulowany postęp: 0-90% w (liczba_słówek * 1.5s), potem 90-99.99% w 20s
     const progressInterval = setInterval(() => {
       const elapsed = Date.now() - startTime
 
       setProgress(() => {
-        // Faza 1: 0-90% w czasie zależnym od liczby słówek
         if (elapsed < baseTimeMs) {
           const phase1Progress = (elapsed / baseTimeMs) * 90
           return Math.min(phase1Progress, 90)
@@ -78,24 +116,21 @@ function LoadingSpinner({ message, flashcardsCount = 10 }: { message: string, fl
 
         const phase2Start = elapsed - baseTimeMs
 
-        // Faza 2: 90-99% w 10 sekund
         if (phase2Start < 10000) {
           return 90 + (phase2Start / 10000) * 9
         }
 
-        // Faza 3: 99-99.9% w 7 sekund
         if (phase2Start < 17000) {
           const phase3Elapsed = phase2Start - 10000
           return 99 + (phase3Elapsed / 7000) * 0.9
         }
 
-        // Faza 4: 99.9-99.99% w 3 sekundy
         if (phase2Start < 20000) {
           const phase4Elapsed = phase2Start - 17000
           return 99.9 + (phase4Elapsed / 3000) * 0.09
         }
 
-        return 99.99 // Zatrzymaj na 99.99%
+        return 99.99
       })
     }, 100)
 
@@ -131,8 +166,12 @@ function LoadingSpinner({ message, flashcardsCount = 10 }: { message: string, fl
 }
 
 export default function ExercisesPage() {
+  const searchParams = useSearchParams()
+  const initialSetId = searchParams.get('setId') || ''
+
   const [sets, setSets] = useState<FlashcardSet[]>([])
-  const [selectedSetId, setSelectedSetId] = useState('')
+  const [selectedLanguage, setSelectedLanguage] = useState('')
+  const [selectedSetId, setSelectedSetId] = useState(initialSetId)
   const [flashcards, setFlashcards] = useState<Flashcard[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -148,9 +187,35 @@ export default function ExercisesPage() {
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0)
   const [checkingSentence, setCheckingSentence] = useState(false)
 
+  // Grupuj zestawy po językach
+  const setsByLanguage: Record<string, FlashcardSet[]> = {}
+  for (const set of sets) {
+    if (!setsByLanguage[set.language]) {
+      setsByLanguage[set.language] = []
+    }
+    setsByLanguage[set.language].push(set)
+  }
+
+  const availableLanguages = Object.keys(setsByLanguage).sort(
+    (a, b) => setsByLanguage[b].length - setsByLanguage[a].length
+  )
+
+  const filteredSets = selectedLanguage ? setsByLanguage[selectedLanguage] || [] : []
+
   useEffect(() => {
     fetchSets()
   }, [])
+
+  // Gdy zestawy się załadują i mamy initialSetId, ustaw język
+  useEffect(() => {
+    if (sets.length > 0 && initialSetId) {
+      const set = sets.find(s => s.id === initialSetId)
+      if (set) {
+        setSelectedLanguage(set.language)
+        setSelectedSetId(set.id)
+      }
+    }
+  }, [sets, initialSetId])
 
   useEffect(() => {
     if (selectedSetId) {
@@ -407,56 +472,94 @@ export default function ExercisesPage() {
 
       <Card className="p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Wybierz zestaw i typ ćwiczenia
+          Wybierz język, zestaw i typ ćwiczenia
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <Select
-            id="set"
-            label="Zestaw"
-            value={selectedSetId}
-            onChange={(e) => setSelectedSetId(e.target.value)}
-            options={[
-              { value: '', label: 'Wybierz zestaw...' },
-              ...sets.map((set) => ({
-                value: set.id,
-                label: `${set.name} (${set._count.flashcards} fiszek)`,
-              })),
-            ]}
-          />
+        {/* Wybór języka */}
+        {availableLanguages.length > 0 && (
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Język
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {availableLanguages.map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => {
+                    setSelectedLanguage(lang)
+                    setSelectedSetId('')
+                    setGapExercises([])
+                    setSentenceExercises([])
+                  }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                    selectedLanguage === lang
+                      ? 'border-primary-500 bg-primary-50 text-primary-700'
+                      : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <span className="text-xl">{languageFlags[lang] || '🌍'}</span>
+                  <span className="font-medium">{languageNames[lang] || lang}</span>
+                  <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                    {setsByLanguage[lang].length}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-          <Select
-            id="type"
-            label="Typ ćwiczenia"
-            value={exerciseType}
-            onChange={(e) => {
-              setExerciseType(e.target.value as ExerciseType)
-              setGapExercises([])
-              setSentenceExercises([])
-            }}
-            options={[
-              { value: 'gap', label: 'Uzupełnianie luk' },
-              { value: 'sentence', label: 'Układanie zdań' },
-            ]}
-          />
-        </div>
+        {/* Wybór zestawu - tylko po wybraniu języka */}
+        {selectedLanguage && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <Select
+              id="set"
+              label="Zestaw"
+              value={selectedSetId}
+              onChange={(e) => setSelectedSetId(e.target.value)}
+              options={[
+                { value: '', label: 'Wybierz zestaw...' },
+                ...filteredSets.map((set) => ({
+                  value: set.id,
+                  label: `${set.name} (${set._count.flashcards} fiszek)`,
+                })),
+              ]}
+            />
 
-        <div className="flex gap-3">
-          <Button
-            onClick={startExercises}
-            disabled={!selectedSetId || generating}
-          >
-            {(gapExercises.length > 0 || sentenceExercises.length > 0)
-              ? 'Generuj nowe ćwiczenia'
-              : 'Rozpocznij ćwiczenia'}
-          </Button>
+            <Select
+              id="type"
+              label="Typ ćwiczenia"
+              value={exerciseType}
+              onChange={(e) => {
+                setExerciseType(e.target.value as ExerciseType)
+                setGapExercises([])
+                setSentenceExercises([])
+              }}
+              options={[
+                { value: 'gap', label: 'Uzupełnianie luk' },
+                { value: 'sentence', label: 'Układanie zdań' },
+              ]}
+            />
+          </div>
+        )}
 
-          {(gapExercises.length > 0 || sentenceExercises.length > 0) && (
-            <Button variant="secondary" onClick={resetExercises}>
-              Resetuj odpowiedzi
+        {selectedLanguage && (
+          <div className="flex gap-3">
+            <Button
+              onClick={startExercises}
+              disabled={!selectedSetId || generating}
+            >
+              {(gapExercises.length > 0 || sentenceExercises.length > 0)
+                ? 'Generuj nowe ćwiczenia'
+                : 'Rozpocznij ćwiczenia'}
             </Button>
-          )}
-        </div>
+
+            {(gapExercises.length > 0 || sentenceExercises.length > 0) && (
+              <Button variant="secondary" onClick={resetExercises}>
+                Resetuj odpowiedzi
+              </Button>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Loading state */}
@@ -722,7 +825,19 @@ export default function ExercisesPage() {
       )}
 
       {/* Empty states */}
-      {!selectedSetId && !generating && (
+      {!selectedLanguage && !generating && availableLanguages.length > 0 && (
+        <Card className="p-8 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Wybierz język</h3>
+          <p className="text-gray-500">Wybierz język, aby zobaczyć dostępne zestawy do ćwiczeń.</p>
+        </Card>
+      )}
+
+      {selectedLanguage && !selectedSetId && !generating && (
         <Card className="p-8 text-center">
           <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -730,7 +845,21 @@ export default function ExercisesPage() {
             </svg>
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Wybierz zestaw</h3>
-          <p className="text-gray-500">Wybierz zestaw fiszek, aby rozpocząć ćwiczenia.</p>
+          <p className="text-gray-500">
+            Masz {filteredSets.length} {filteredSets.length === 1 ? 'zestaw' : filteredSets.length < 5 ? 'zestawy' : 'zestawów'} w języku {languageNames[selectedLanguage] || selectedLanguage}.
+          </p>
+        </Card>
+      )}
+
+      {availableLanguages.length === 0 && !loading && (
+        <Card className="p-8 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Brak zestawów</h3>
+          <p className="text-gray-500">Utwórz zestaw z fiszkami, aby móc ćwiczyć.</p>
         </Card>
       )}
 

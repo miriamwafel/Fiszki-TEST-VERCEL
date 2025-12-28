@@ -328,7 +328,7 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
                   Powtórka
                 </Button>
               </Link>
-              <Link href="/exercises" className="flex-1 sm:flex-none">
+              <Link href={`/exercises?setId=${set.id}`} className="flex-1 sm:flex-none">
                 <Button variant="secondary" className="w-full sm:w-auto text-xs sm:text-sm">
                   <svg
                     className="w-4 h-4 mr-1 sm:mr-2 flex-shrink-0"
