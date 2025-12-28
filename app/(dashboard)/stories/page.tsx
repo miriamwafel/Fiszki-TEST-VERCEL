@@ -127,7 +127,6 @@ interface Story {
   wordCount: number
   createdAt: string
   vocabulary?: { word: string; translation: string }[]
-  vocabularyLoading?: boolean // Flaga że słowniczek się generuje w tle
 }
 
 interface FlashcardSet {
@@ -260,52 +259,6 @@ export default function StoriesPage() {
     }
   }
 
-  // Polling dla vocabulary - sprawdza co 3s czy słowniczek jest gotowy
-  const pollForVocabulary = async (storyId: string) => {
-    const maxAttempts = 20 // Max 60 sekund
-    let attempts = 0
-
-    const poll = async () => {
-      attempts++
-      try {
-        const response = await fetch('/api/stories')
-        const stories = await response.json()
-        const updatedStory = stories.find((s: Story) => s.id === storyId)
-
-        // Vocabulary w bazie to obiekt (vocabularyMap), konwertuj na array dla frontendu
-        if (updatedStory?.vocabulary && typeof updatedStory.vocabulary === 'object') {
-          const vocabObj = updatedStory.vocabulary
-          const keys = Object.keys(vocabObj)
-
-          if (keys.length > 0) {
-            // Konwertuj obiekt na array
-            const vocabArray = keys.slice(0, 15).map((word) => ({
-              word,
-              translation: vocabObj[word]?.translation || vocabObj[word] || '',
-            }))
-
-            // Vocabulary gotowy!
-            setSelectedStory((prev) =>
-              prev?.id === storyId ? { ...prev, vocabulary: vocabArray, vocabularyLoading: false } : prev
-            )
-            setStories((prev) =>
-              prev.map((s) => (s.id === storyId ? { ...s, vocabulary: vocabArray, vocabularyLoading: false } : s))
-            )
-            return // Stop polling
-          }
-        }
-
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 3000) // Sprawdź ponownie za 3s
-        }
-      } catch (error) {
-        console.error('Polling error:', error)
-      }
-    }
-
-    setTimeout(poll, 3000) // Zacznij po 3s
-  }
-
   const handleGenerate = async () => {
     setGenerating(true)
 
@@ -332,14 +285,8 @@ export default function StoriesPage() {
         throw new Error(data.error)
       }
 
-      // Pokaż historię od razu!
       setSelectedStory(data)
       setStories((prev) => [data, ...prev])
-
-      // Jeśli vocabulary się generuje w tle - polluj
-      if (data.vocabularyLoading) {
-        pollForVocabulary(data.id)
-      }
     } catch (error) {
       console.error('Failed to generate story:', error)
       alert('Wystąpił błąd podczas generowania historii')
@@ -825,21 +772,11 @@ export default function StoriesPage() {
                 </Link>
               </div>
 
-              {/* Słowniczek - z loaderem gdy się generuje */}
-              <div className="mt-6 pt-6 border-t">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
-                  Słownictwo z historii
-                </h3>
-
-                {selectedStory.vocabularyLoading || (Array.isArray(selectedStory.vocabulary) && selectedStory.vocabulary.length === 0) ? (
-                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
-                    <div className="w-5 h-5 border-2 border-blue-200 rounded-full animate-spin border-t-blue-600" />
-                    <div>
-                      <p className="text-blue-700 font-medium">Generuję słowniczek...</p>
-                      <p className="text-blue-600 text-sm">Historia jest już gotowa - słowniczek pojawi się za chwilę</p>
-                    </div>
-                  </div>
-                ) : selectedStory.vocabulary && selectedStory.vocabulary.length > 0 ? (
+              {selectedStory.vocabulary && selectedStory.vocabulary.length > 0 && (
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Słownictwo z historii
+                  </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {selectedStory.vocabulary.map((item, index) => (
                       <button
@@ -854,8 +791,8 @@ export default function StoriesPage() {
                       </button>
                     ))}
                   </div>
-                ) : null}
-              </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12">

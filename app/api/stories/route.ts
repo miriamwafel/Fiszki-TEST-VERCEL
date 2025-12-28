@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { generateStoryFast, generateVocabularyForStory } from '@/lib/gemini'
+import { generateStory } from '@/lib/gemini'
 import prisma from '@/lib/db'
 
 export async function GET() {
@@ -59,44 +59,24 @@ export async function POST(request: Request) {
 
     const languageName = languageNames[language] || language
 
-    // KROK 1: Szybkie generowanie samej historii (3-5s zamiast 15-30s!)
-    const quickStory = await generateStoryFast(languageName, wordCount, difficulty, topic)
+    // Generuj historię RAZEM ze słowniczkiem (lepsza jakość!)
+    const storyResult = await generateStory(languageName, wordCount, difficulty, topic)
 
-    // Zapisz historię BEZ vocabulary (pokaż userowi od razu)
     const story = await prisma.story.create({
       data: {
-        title: quickStory.title,
-        content: quickStory.content,
+        title: storyResult.title,
+        content: storyResult.content,
         language,
         difficulty,
         wordCount,
-        vocabulary: {}, // Puste - wygenerujemy w tle
+        vocabulary: JSON.parse(JSON.stringify(storyResult.vocabularyMap)),
         userId: session.user.id,
       },
     })
 
-    // KROK 2: Generuj vocabulary W TLE (nie blokuje odpowiedzi!)
-    // Używamy Promise bez await - odpowiedź idzie od razu
-    generateVocabularyForStory(quickStory.content, languageName, difficulty)
-      .then(async (vocabResult) => {
-        // Zaktualizuj historię z vocabulary
-        await prisma.story.update({
-          where: { id: story.id },
-          data: {
-            vocabulary: JSON.parse(JSON.stringify(vocabResult.vocabularyMap)),
-          },
-        })
-        console.log(`[Stories] Vocabulary generated for story ${story.id}`)
-      })
-      .catch((error) => {
-        console.error(`[Stories] Failed to generate vocabulary for ${story.id}:`, error)
-      })
-
-    // Zwróć historię OD RAZU (bez czekania na vocabulary)
     return NextResponse.json({
       ...story,
-      vocabulary: [], // Puste - frontend pokaże "Generuję słowniczek..."
-      vocabularyLoading: true, // Flaga dla frontendu
+      vocabulary: storyResult.vocabulary, // Lista 10-15 najważniejszych słów
     })
   } catch (error) {
     console.error('Create story error:', error)
