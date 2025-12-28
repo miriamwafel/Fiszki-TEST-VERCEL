@@ -284,19 +284,20 @@ export async function PUT(
       })
     }
 
-    progress = await prisma.userGrammarProgress.update({
+    const updatedProgress = await prisma.userGrammarProgress.update({
       where: { id: progress.id },
       data: updateData,
-      include: {
-        reviews: {
-          orderBy: { scheduledDate: 'asc' },
-        },
-      },
+    })
+
+    // Pobierz powtórki osobno
+    const progressReviews = await prisma.grammarReviewSchedule.findMany({
+      where: { progressId: progress.id },
+      orderBy: { scheduledDate: 'asc' },
     })
 
     return NextResponse.json({
-      progress,
-      reviews: progress.reviews || [],
+      progress: updatedProgress,
+      reviews: progressReviews,
     })
   } catch (error) {
     console.error('Update grammar progress error:', error)
