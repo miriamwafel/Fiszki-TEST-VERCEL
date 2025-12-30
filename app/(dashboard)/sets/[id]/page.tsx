@@ -21,6 +21,14 @@ export default async function SetPage({
       flashcards: {
         orderBy: { createdAt: 'desc' },
       },
+      story: {
+        select: {
+          id: true,
+          title: true,
+          language: true,
+          difficulty: true,
+        },
+      },
     },
   })
 
