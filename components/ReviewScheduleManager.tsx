@@ -162,7 +162,9 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   const isToday = (dateString: string) => {
     const date = new Date(dateString)
     const today = new Date()
-    return date.toDateString() === today.toDateString()
+    date.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    return date.getTime() === today.getTime()
   }
 
   if (loading) {

@@ -73,6 +73,14 @@ const languageFlags: Record<string, string> = {
   uk: '🇺🇦',
 }
 
+// Helper do bezpiecznego tworzenia klucza daty (lokalnie, bez UTC)
+const getLocalDateKey = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export function ReviewCalendar() {
   const [reviews, setReviews] = useState<ReviewItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -106,10 +114,11 @@ export function ReviewCalendar() {
     days.push(day)
   }
 
-  // Grupuj reviews po dacie
+  // Grupuj reviews po dacie (używamy lokalnej daty, nie UTC)
   const reviewsByDate: Record<string, ReviewItem[]> = {}
   for (const review of reviews) {
-    const dateKey = new Date(review.scheduledDate).toISOString().split('T')[0]
+    const reviewDate = new Date(review.scheduledDate)
+    const dateKey = getLocalDateKey(reviewDate)
     if (!reviewsByDate[dateKey]) {
       reviewsByDate[dateKey] = []
     }
@@ -117,7 +126,7 @@ export function ReviewCalendar() {
   }
 
   // Policz nieukończone powtórki na dziś
-  const todayKey = today.toISOString().split('T')[0]
+  const todayKey = getLocalDateKey(today)
   const todaysReviews = reviewsByDate[todayKey]?.filter(r => !r.completed) || []
   const overdueReviews = reviews.filter(r => {
     const reviewDate = new Date(r.scheduledDate)
@@ -262,7 +271,7 @@ export function ReviewCalendar() {
       {/* Mini kalendarz - 14 dni */}
       <div className="flex gap-1 mb-4 overflow-x-auto pb-2">
         {days.map((day) => {
-          const dateKey = day.toISOString().split('T')[0]
+          const dateKey = getLocalDateKey(day)
           const dayReviews = reviewsByDate[dateKey] || []
           const pendingCount = dayReviews.filter(r => !r.completed).length
           const isToday = day.getTime() === today.getTime()
