@@ -51,6 +51,8 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   const [completed, setCompleted] = useState(false)
   const [stats, setStats] = useState({ correct: 0, incorrect: 0 })
   const [incorrectQueue, setIncorrectQueue] = useState<Flashcard[]>([])
+  const [correctionMode, setCorrectionMode] = useState(false)
+  const [correctionDone, setCorrectionDone] = useState(false)
 
   useEffect(() => {
     // Initialize queue with shuffled flashcards, prioritizing non-mastered ones
@@ -75,7 +77,20 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (showResult || !currentCard) return
+    if (!currentCard) return
+
+    // Tryb korekcji - sprawdź czy wpisano poprawną odpowiedź
+    if (correctionMode) {
+      const normalizedAnswer = answer.trim().toLowerCase()
+      const normalizedWord = currentCard.word.toLowerCase()
+      if (normalizedAnswer === normalizedWord) {
+        setCorrectionDone(true)
+        setCorrectionMode(false)
+      }
+      return
+    }
+
+    if (showResult) return
 
     // Don't submit empty answers - prevents accidental submission on Enter
     if (!answer.trim()) return
@@ -95,6 +110,9 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     // Add incorrect answers to retry queue
     if (!correct) {
       setIncorrectQueue((prev) => [...prev, currentCard])
+      // Włącz tryb korekcji - użytkownik musi wpisać poprawną odpowiedź
+      setCorrectionMode(true)
+      setAnswer('')
     }
 
     // Update stats in database
@@ -110,11 +128,13 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     } catch (error) {
       console.error('Failed to update stats:', error)
     }
-  }, [answer, currentCard, showResult])
+  }, [answer, currentCard, showResult, correctionMode])
 
   const handleNext = useCallback(() => {
     setShowResult(false)
     setAnswer('')
+    setCorrectionMode(false)
+    setCorrectionDone(false)
 
     if (currentIndex < queue.length - 1) {
       setCurrentIndex((prev) => prev + 1)
@@ -136,18 +156,21 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     setStats({ correct: 0, incorrect: 0 })
     setShowResult(false)
     setAnswer('')
+    setCorrectionMode(false)
+    setCorrectionDone(false)
   }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && showResult) {
+      // Pozwól przejść dalej tylko gdy odpowiedź poprawna LUB poprawiono po błędzie
+      if (e.key === 'Enter' && showResult && (isCorrect || correctionDone)) {
         handleNext()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showResult, handleNext])
+  }, [showResult, handleNext, isCorrect, correctionDone])
 
   if (completed) {
     const totalAnswers = stats.correct + stats.incorrect
@@ -252,14 +275,16 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
           <Input
             value={answer}
             onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Wpisz odpowiedź..."
-            disabled={showResult}
+            placeholder={correctionMode ? "Wpisz poprawną odpowiedź..." : "Wpisz odpowiedź..."}
+            disabled={showResult && !correctionMode}
             autoFocus
             className={`text-center text-lg ${
               showResult
-                ? isCorrect
+                ? isCorrect || correctionDone
                   ? 'border-green-500 bg-green-50'
-                  : 'border-red-500 bg-red-50'
+                  : correctionMode
+                    ? 'border-orange-500 bg-orange-50'
+                    : 'border-red-500 bg-red-50'
                 : ''
             }`}
           />
@@ -268,13 +293,18 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
             <div className="mt-4 text-center">
               {isCorrect ? (
                 <p className="text-green-600 font-semibold">Poprawnie!</p>
+              ) : correctionDone ? (
+                <div>
+                  <p className="text-green-600 font-semibold">Dobrze! Teraz możesz przejść dalej</p>
+                </div>
               ) : (
                 <div>
                   <p className="text-red-600 font-semibold mb-1">Niepoprawnie</p>
-                  <p className="text-gray-600">
+                  <p className="text-gray-600 mb-3">
                     Poprawna odpowiedź:{' '}
                     <span className="font-semibold">{currentCard.word}</span>
                   </p>
+                  <p className="text-sm text-gray-500 mb-2">Wpisz poprawną odpowiedź, aby przejść dalej:</p>
                 </div>
               )}
             </div>
@@ -282,22 +312,26 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
 
           <div className="mt-6 flex justify-center">
             {showResult ? (
-              <Button onClick={handleNext}>
-                Dalej
-                <svg
-                  className="w-5 h-5 ml-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 7l5 5m0 0l-5 5m5-5H6"
-                  />
-                </svg>
-              </Button>
+              correctionMode ? (
+                <Button type="submit">Sprawdź</Button>
+              ) : (
+                <Button onClick={handleNext}>
+                  Dalej
+                  <svg
+                    className="w-5 h-5 ml-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 7l5 5m0 0l-5 5m5-5H6"
+                    />
+                  </svg>
+                </Button>
+              )
             ) : (
               <Button type="submit">Sprawdź</Button>
             )}
