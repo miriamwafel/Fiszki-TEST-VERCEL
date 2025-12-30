@@ -25,6 +25,14 @@ export async function GET(
         flashcards: {
           orderBy: { createdAt: 'desc' },
         },
+        story: {
+          select: {
+            id: true,
+            title: true,
+            language: true,
+            difficulty: true,
+          },
+        },
       },
     })
 
@@ -84,16 +92,31 @@ export async function PATCH(
     }
 
     const { id } = await params
-    const { name, description } = await request.json()
+    const body = await request.json()
+    const { name, description, storyId } = body
 
-    const set = await prisma.flashcardSet.updateMany({
+    // Buduj obiekt aktualizacji dynamicznie
+    const updateData: { name?: string; description?: string; storyId?: string | null } = {}
+
+    if (name !== undefined) updateData.name = name
+    if (description !== undefined) updateData.description = description
+    if ('storyId' in body) updateData.storyId = storyId // null = odepnij historyjkę
+
+    const set = await prisma.flashcardSet.update({
       where: {
         id,
         userId: session.user.id,
       },
-      data: {
-        name,
-        description,
+      data: updateData,
+      include: {
+        story: {
+          select: {
+            id: true,
+            title: true,
+            language: true,
+            difficulty: true,
+          },
+        },
       },
     })
 

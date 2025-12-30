@@ -118,6 +118,12 @@ function AILoadingOverlay({ messages, isGenerating }: { messages: string[], isGe
   )
 }
 
+interface LinkedSet {
+  id: string
+  name: string
+  _count: { flashcards: number }
+}
+
 interface Story {
   id: string
   title: string
@@ -127,12 +133,14 @@ interface Story {
   wordCount: number
   createdAt: string
   vocabulary?: { word: string; translation: string }[]
+  sets?: LinkedSet[]
 }
 
 interface FlashcardSet {
   id: string
   name: string
   language: string
+  storyId?: string | null
 }
 
 const languages = [
@@ -186,6 +194,9 @@ export default function StoriesPage() {
   const [newSetName, setNewSetName] = useState('')
   const [newSetLanguage, setNewSetLanguage] = useState('')
   const [creatingSet, setCreatingSet] = useState(false)
+  const [showLinkSetModal, setShowLinkSetModal] = useState(false)
+  const [linkingSet, setLinkingSet] = useState(false)
+  const [setToLink, setSetToLink] = useState('')
 
   useEffect(() => {
     fetchStories()
@@ -491,6 +502,102 @@ export default function StoriesPage() {
     }
   }
 
+  const handleLinkSet = async () => {
+    if (!setToLink || !selectedStory) return
+
+    setLinkingSet(true)
+    try {
+      const response = await fetch(`/api/sets/${setToLink}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: selectedStory.id }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to link set')
+      }
+
+      const updatedSet = await response.json()
+
+      // Zaktualizuj lokalny stan historyjki
+      setSelectedStory((prev) => {
+        if (!prev) return null
+        const existingSets = prev.sets || []
+        const newLinkedSet: LinkedSet = {
+          id: updatedSet.id,
+          name: updatedSet.name || sets.find(s => s.id === setToLink)?.name || '',
+          _count: { flashcards: 0 },
+        }
+        return { ...prev, sets: [...existingSets, newLinkedSet] }
+      })
+
+      // Zaktualizuj listę historyjek
+      setStories((prev) =>
+        prev.map((s) => {
+          if (s.id !== selectedStory.id) return s
+          const existingSets = s.sets || []
+          const newLinkedSet: LinkedSet = {
+            id: updatedSet.id,
+            name: updatedSet.name || sets.find(set => set.id === setToLink)?.name || '',
+            _count: { flashcards: 0 },
+          }
+          return { ...s, sets: [...existingSets, newLinkedSet] }
+        })
+      )
+
+      // Zaktualizuj storyId w zestawach
+      setSets((prev) =>
+        prev.map((s) =>
+          s.id === setToLink ? { ...s, storyId: selectedStory.id } : s
+        )
+      )
+
+      setShowLinkSetModal(false)
+      setSetToLink('')
+    } catch (error) {
+      console.error('Failed to link set:', error)
+      alert('Nie udało się przypisać zestawu')
+    } finally {
+      setLinkingSet(false)
+    }
+  }
+
+  const handleUnlinkSet = async (setId: string) => {
+    if (!selectedStory) return
+
+    try {
+      const response = await fetch(`/api/sets/${setId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storyId: null }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to unlink set')
+      }
+
+      // Zaktualizuj lokalny stan
+      setSelectedStory((prev) => {
+        if (!prev) return null
+        return { ...prev, sets: prev.sets?.filter((s) => s.id !== setId) || [] }
+      })
+
+      setStories((prev) =>
+        prev.map((s) => {
+          if (s.id !== selectedStory.id) return s
+          return { ...s, sets: s.sets?.filter((set) => set.id !== setId) || [] }
+        })
+      )
+
+      setSets((prev) =>
+        prev.map((s) => (s.id === setId ? { ...s, storyId: null } : s))
+      )
+    } catch (error) {
+      console.error('Failed to unlink set:', error)
+      alert('Nie udało się odpiąć zestawu')
+    }
+  }
+
   const renderStoryContent = (content: string) => {
     const words = content.split(/(\s+)/)
 
@@ -761,15 +868,59 @@ export default function StoriesPage() {
                 </p>
               </div>
 
-              <div className="mb-4">
-                <Link href="/sets" className="block sm:inline-block">
-                  <button className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors">
+              {/* Przypisane zestawy */}
+              <div className="mb-4 p-4 bg-gray-50 rounded-lg border">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
-                    Przejdź do zestawów
+                    Powiązane zestawy fiszek
+                  </h3>
+                  <button
+                    onClick={() => setShowLinkSetModal(true)}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Przypisz zestaw
                   </button>
-                </Link>
+                </div>
+
+                {selectedStory.sets && selectedStory.sets.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedStory.sets.map((set) => (
+                      <div
+                        key={set.id}
+                        className="flex items-center justify-between p-2 bg-white rounded border hover:border-primary-300 transition-colors"
+                      >
+                        <Link
+                          href={`/sets/${set.id}`}
+                          className="flex-1 flex items-center gap-2 text-gray-900 hover:text-primary-600"
+                        >
+                          <span className="font-medium text-sm">{set.name}</span>
+                          <span className="text-xs text-gray-500">
+                            ({set._count.flashcards} fiszek)
+                          </span>
+                        </Link>
+                        <button
+                          onClick={() => handleUnlinkSet(set.id)}
+                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          title="Odepnij zestaw"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Brak przypisanych zestawów. Kliknij "Przypisz zestaw" aby powiązać zestaw z tą historyjką.
+                  </p>
+                )}
               </div>
 
               {selectedStory.vocabulary && selectedStory.vocabulary.length > 0 && (
@@ -1024,6 +1175,87 @@ export default function StoriesPage() {
               Utwórz zestaw
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Link set to story modal */}
+      <Modal
+        isOpen={showLinkSetModal}
+        onClose={() => {
+          setShowLinkSetModal(false)
+          setSetToLink('')
+        }}
+        title="Przypisz zestaw do historyjki"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Wybierz zestaw fiszek, który chcesz powiązać z historyjką "{selectedStory?.title}".
+          </p>
+
+          {/* Filtruj zestawy - pokaż tylko te z tym samym językiem i niepowiązane */}
+          {(() => {
+            const availableSets = sets.filter(
+              (s) =>
+                s.language === selectedStory?.language &&
+                !s.storyId &&
+                !selectedStory?.sets?.some((linked) => linked.id === s.id)
+            )
+
+            if (availableSets.length === 0) {
+              return (
+                <div className="text-center py-4">
+                  <p className="text-gray-500 text-sm mb-3">
+                    Brak dostępnych zestawów w tym języku ({selectedStory?.language?.toUpperCase()}).
+                  </p>
+                  <Button
+                    onClick={() => {
+                      setShowLinkSetModal(false)
+                      setNewSetLanguage(selectedStory?.language || '')
+                      setShowNewSetModal(true)
+                    }}
+                  >
+                    Utwórz nowy zestaw
+                  </Button>
+                </div>
+              )
+            }
+
+            return (
+              <>
+                <Select
+                  id="setToLink"
+                  label="Wybierz zestaw"
+                  value={setToLink}
+                  onChange={(e) => setSetToLink(e.target.value)}
+                  options={[
+                    { value: '', label: 'Wybierz zestaw...' },
+                    ...availableSets.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    })),
+                  ]}
+                />
+                <div className="flex gap-3 justify-end pt-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setShowLinkSetModal(false)
+                      setSetToLink('')
+                    }}
+                  >
+                    Anuluj
+                  </Button>
+                  <Button
+                    onClick={handleLinkSet}
+                    loading={linkingSet}
+                    disabled={!setToLink}
+                  >
+                    Przypisz zestaw
+                  </Button>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </Modal>
     </div>

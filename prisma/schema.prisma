@@ -50,10 +50,15 @@ model FlashcardSet {
   userId      String
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Opcjonalne powiązanie z historyjką
+  storyId     String?
+  story       Story?      @relation(fields: [storyId], references: [id], onDelete: SetNull)
+
   flashcards  Flashcard[]
   reviews     ReviewSchedule[]
 
   @@index([userId])
+  @@index([storyId])
 }
 
 // Harmonogram powtórek dla zestawu
@@ -102,6 +107,9 @@ model Story {
 
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Zestawy fiszek powiązane z tą historyjką
+  sets        FlashcardSet[]
 
   @@index([userId])
 }

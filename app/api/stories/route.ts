@@ -15,6 +15,15 @@ export async function GET() {
     const stories = await prisma.story.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: 'desc' },
+      include: {
+        sets: {
+          select: {
+            id: true,
+            name: true,
+            _count: { select: { flashcards: true } },
+          },
+        },
+      },
     })
 
     return NextResponse.json(stories)
