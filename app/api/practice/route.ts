@@ -88,7 +88,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { flashcardId, correct } = await request.json()
+    const { flashcardId, correct, override } = await request.json()
 
     if (!flashcardId || correct === undefined) {
       return NextResponse.json(
@@ -119,8 +119,18 @@ export async function POST(request: Request) {
 
     let stats
     if (existingStats) {
-      const newCorrect = correct ? existingStats.correct + 1 : existingStats.correct
-      const newIncorrect = correct ? existingStats.incorrect : existingStats.incorrect + 1
+      let newCorrect = existingStats.correct
+      let newIncorrect = existingStats.incorrect
+
+      if (override && correct) {
+        // Korekta: cofnij błędną odpowiedź i dodaj poprawną
+        newCorrect = existingStats.correct + 1
+        newIncorrect = Math.max(0, existingStats.incorrect - 1)
+      } else if (correct) {
+        newCorrect = existingStats.correct + 1
+      } else {
+        newIncorrect = existingStats.incorrect + 1
+      }
 
       // Mark as mastered if correct 3+ times in a row (simplified logic)
       const mastered = correct && newCorrect >= 3 && newIncorrect === 0
@@ -129,7 +139,7 @@ export async function POST(request: Request) {
         where: { id: existingStats.id },
         data: {
           correct: newCorrect,
-          incorrect: correct ? existingStats.incorrect : existingStats.incorrect + 1,
+          incorrect: newIncorrect,
           lastPractice: new Date(),
           mastered,
         },

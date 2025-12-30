@@ -53,6 +53,7 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   const [incorrectQueue, setIncorrectQueue] = useState<Flashcard[]>([])
   const [correctionMode, setCorrectionMode] = useState(false)
   const [correctionDone, setCorrectionDone] = useState(false)
+  const [userAnswer, setUserAnswer] = useState('') // Oryginalna odpowiedź użytkownika
 
   useEffect(() => {
     // Initialize queue with shuffled flashcards, prioritizing non-mastered ones
@@ -112,6 +113,7 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
       setIncorrectQueue((prev) => [...prev, currentCard])
       // Włącz tryb korekcji - użytkownik musi wpisać poprawną odpowiedź
       setCorrectionMode(true)
+      setUserAnswer(answer) // Zapisz oryginalną odpowiedź
       setAnswer('')
     }
 
@@ -135,6 +137,7 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     setAnswer('')
     setCorrectionMode(false)
     setCorrectionDone(false)
+    setUserAnswer('')
 
     if (currentIndex < queue.length - 1) {
       setCurrentIndex((prev) => prev + 1)
@@ -148,6 +151,41 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     }
   }, [currentIndex, queue.length, incorrectQueue])
 
+  // Uznaj odpowiedź za poprawną (np. literówka)
+  const handleOverrideCorrect = useCallback(async () => {
+    if (!currentCard) return
+
+    // Popraw statystyki lokalne
+    setStats((prev) => ({
+      correct: prev.correct + 1,
+      incorrect: prev.incorrect - 1,
+    }))
+
+    // Usuń z kolejki powtórek
+    setIncorrectQueue((prev) => prev.filter((card) => card.id !== currentCard.id))
+
+    // Wyłącz tryb korekcji i pozwól przejść dalej
+    setCorrectionMode(false)
+    setCorrectionDone(true)
+    setIsCorrect(true)
+
+    // Zaktualizuj w bazie - wyślij jako poprawną odpowiedź
+    try {
+      // Najpierw cofnij błędną odpowiedź, potem dodaj poprawną
+      await fetch('/api/practice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          flashcardId: currentCard.id,
+          correct: true,
+          override: true, // Flaga że to korekta
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to override stats:', error)
+    }
+  }, [currentCard])
+
   const handleRestart = () => {
     setQueue(shuffleArray(initialFlashcards))
     setIncorrectQueue([])
@@ -158,6 +196,7 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     setAnswer('')
     setCorrectionMode(false)
     setCorrectionDone(false)
+    setUserAnswer('')
   }
 
   useEffect(() => {
@@ -300,11 +339,23 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
               ) : (
                 <div>
                   <p className="text-red-600 font-semibold mb-1">Niepoprawnie</p>
+                  {userAnswer && (
+                    <p className="text-gray-500 text-sm mb-2">
+                      Twoja odpowiedź: <span className="font-medium">{userAnswer}</span>
+                    </p>
+                  )}
                   <p className="text-gray-600 mb-3">
                     Poprawna odpowiedź:{' '}
                     <span className="font-semibold">{currentCard.word}</span>
                   </p>
-                  <p className="text-sm text-gray-500 mb-2">Wpisz poprawną odpowiedź, aby przejść dalej:</p>
+                  <button
+                    type="button"
+                    onClick={handleOverrideCorrect}
+                    className="text-sm text-primary-600 hover:text-primary-700 hover:underline mb-3"
+                  >
+                    Moja odpowiedź była prawidłowa
+                  </button>
+                  <p className="text-sm text-gray-500 mb-2">lub wpisz poprawną odpowiedź, aby przejść dalej:</p>
                 </div>
               )}
             </div>
