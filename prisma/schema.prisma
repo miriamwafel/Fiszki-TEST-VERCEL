@@ -23,6 +23,7 @@ model User {
   settings          UserSettings?
   grammarProgress   UserGrammarProgress[]
   grammarReviews    GrammarReviewSchedule[]
+  stickyNotes       StickyNote[]
 }
 
 // Ustawienia użytkownika (domyślne dni powtórek itp.)
@@ -175,4 +176,20 @@ model GrammarReviewSchedule {
   @@index([progressId])
   @@index([userId])
   @@index([scheduledDate])
+}
+
+// Szybkie notatki (sticky notes)
+model StickyNote {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  color     String   @default("yellow") // yellow, pink, blue, green, purple
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }

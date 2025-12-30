@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { Navbar } from '@/components/Navbar'
 import { PrefetchProvider } from '@/components/PrefetchProvider'
+import { StickyNotesWidget } from '@/components/StickyNotesWidget'
 
 export default async function DashboardLayout({
   children,
@@ -23,6 +24,7 @@ export default async function DashboardLayout({
           {children}
         </main>
       </PrefetchProvider>
+      <StickyNotesWidget />
     </div>
   )
 }

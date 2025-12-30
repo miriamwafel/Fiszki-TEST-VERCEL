@@ -6,5 +6,6 @@ export const config = {
     '/sets/:path*',
     '/stories/:path*',
     '/exercises/:path*',
+    '/notes/:path*',
   ],
 }
