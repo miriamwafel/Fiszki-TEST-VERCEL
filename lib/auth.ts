@@ -30,6 +30,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Nieprawidłowe hasło')
         }
 
+        // Sprawdź czy konto jest zatwierdzone przez admina
+        if (!user.isApproved) {
+          throw new Error('Twoje konto czeka na zatwierdzenie przez administratora')
+        }
+
         return {
           id: user.id,
           email: user.email,

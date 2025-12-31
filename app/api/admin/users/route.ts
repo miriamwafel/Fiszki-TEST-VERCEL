@@ -28,6 +28,7 @@ export async function GET() {
         email: true,
         name: true,
         isAdmin: true,
+        isApproved: true,
         createdAt: true,
         _count: {
           select: {

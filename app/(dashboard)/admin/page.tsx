@@ -9,6 +9,7 @@ interface User {
   email: string
   name: string | null
   isAdmin: boolean
+  isApproved: boolean
   createdAt: string
   _count: {
     sets: number
@@ -97,6 +98,31 @@ export default function AdminPage() {
     }
   }
 
+  const handleToggleApproved = async (userId: string, currentIsApproved: boolean) => {
+    setActionLoading(userId)
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isApproved: !currentIsApproved }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        alert(data.error || 'Błąd podczas aktualizacji')
+        return
+      }
+
+      setUsers(users.map(u =>
+        u.id === userId ? { ...u, isApproved: !currentIsApproved } : u
+      ))
+    } catch {
+      alert('Błąd połączenia')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto">
@@ -136,10 +162,16 @@ export default function AdminPage() {
       </div>
 
       {/* Statystyki */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card className="p-4">
           <div className="text-3xl font-bold text-primary-600">{users.length}</div>
           <div className="text-gray-500 text-sm">Użytkowników</div>
+        </Card>
+        <Card className="p-4">
+          <div className="text-3xl font-bold text-orange-600">
+            {users.filter(u => !u.isApproved).length}
+          </div>
+          <div className="text-gray-500 text-sm">Oczekuje na akceptację</div>
         </Card>
         <Card className="p-4">
           <div className="text-3xl font-bold text-green-600">
@@ -190,15 +222,26 @@ export default function AdminPage() {
                     </div>
                   </td>
                   <td className="px-4 py-4">
-                    {user.isAdmin ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                        Admin
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Użytkownik
-                      </span>
-                    )}
+                    <div className="flex flex-col gap-1">
+                      {user.isAdmin ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Admin
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Użytkownik
+                        </span>
+                      )}
+                      {user.isApproved ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Aktywny
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                          Oczekuje
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-500">
                     <div className="flex gap-3">
@@ -211,6 +254,14 @@ export default function AdminPage() {
                   </td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        variant={user.isApproved ? 'secondary' : 'primary'}
+                        size="sm"
+                        onClick={() => handleToggleApproved(user.id, user.isApproved)}
+                        loading={actionLoading === user.id}
+                      >
+                        {user.isApproved ? 'Dezaktywuj' : 'Aktywuj'}
+                      </Button>
                       <Button
                         variant="secondary"
                         size="sm"

@@ -67,16 +67,24 @@ export async function PATCH(
       return NextResponse.json({ error: 'Cannot remove your own admin rights' }, { status: 400 })
     }
 
+    // Przygotuj dane do aktualizacji
+    const updateData: { isAdmin?: boolean; isApproved?: boolean } = {}
+    if (typeof body.isAdmin === 'boolean') {
+      updateData.isAdmin = body.isAdmin
+    }
+    if (typeof body.isApproved === 'boolean') {
+      updateData.isApproved = body.isApproved
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: {
-        isAdmin: body.isAdmin,
-      },
+      data: updateData,
       select: {
         id: true,
         email: true,
         name: true,
         isAdmin: true,
+        isApproved: true,
       },
     })
 
