@@ -28,6 +28,7 @@ interface GapExercise {
   answer: string
   checked: boolean
   correct: boolean | null
+  hintVisible: boolean
 }
 
 interface SentenceExercise {
@@ -290,6 +291,7 @@ export default function ExercisesPage() {
           answer: '',
           checked: false,
           correct: null,
+          hintVisible: false,
         }))
         setGapExercises(exercises)
       } else {
@@ -365,6 +367,7 @@ export default function ExercisesPage() {
         answer: '',
         checked: false,
         correct: null,
+        hintVisible: false,
       })))
     } else {
       setSentenceExercises(prev => prev.map(ex => ({
@@ -382,6 +385,12 @@ export default function ExercisesPage() {
   const updateGapAnswer = (index: number, value: string) => {
     setGapExercises(prev => prev.map((ex, i) =>
       i === index ? { ...ex, answer: value } : ex
+    ))
+  }
+
+  const toggleGapHint = (index: number) => {
+    setGapExercises(prev => prev.map((ex, i) =>
+      i === index ? { ...ex, hintVisible: !ex.hintVisible } : ex
     ))
   }
 
@@ -665,9 +674,25 @@ export default function ExercisesPage() {
                 {exercise.sentence.split('_____')[1]}
               </p>
 
-              <p className="text-xs text-gray-400 italic mb-3">
-                Podpowiedź: {exercise.hint}
-              </p>
+              {!exercise.checked && (
+                <div className="mb-3">
+                  {exercise.hintVisible ? (
+                    <p className="text-xs text-gray-400 italic">
+                      Podpowiedź: {exercise.hint}
+                    </p>
+                  ) : (
+                    <button
+                      onClick={() => toggleGapHint(index)}
+                      className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Pokaż podpowiedź
+                    </button>
+                  )}
+                </div>
+              )}
 
               {!exercise.checked && (
                 <Button size="sm" onClick={() => checkGapAnswer(index)}>
