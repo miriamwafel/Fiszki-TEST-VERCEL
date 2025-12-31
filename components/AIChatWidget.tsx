@@ -47,18 +47,38 @@ export function AIChatWidget() {
   const [selectedText, setSelectedText] = useState('')
   const [showSelectedText, setShowSelectedText] = useState(false)
   const [exerciseContext, setExerciseContext] = useState<PageContext['exerciseContext']>()
+  const [streamingContent, setStreamingContent] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
 
   const pathname = usePathname()
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const widgetRef = useRef<HTMLDivElement>(null)
+  const lastUserMessageRef = useRef<HTMLDivElement>(null)
 
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+  // Scroll to last user message when user sends a message
+  const scrollToUserMessage = useCallback(() => {
+    if (lastUserMessageRef.current && chatContainerRef.current) {
+      const container = chatContainerRef.current
+      const userMessage = lastUserMessageRef.current
+      const messageTop = userMessage.offsetTop - 16 // Small padding
+      container.scrollTop = messageTop
     }
-  }, [messages])
+  }, [])
+
+  // Smooth scroll during streaming
+  useEffect(() => {
+    if (isStreaming && chatContainerRef.current) {
+      const container = chatContainerRef.current
+      // Scroll down slowly as content streams in
+      const scrollInterval = setInterval(() => {
+        if (container.scrollTop < container.scrollHeight - container.clientHeight - 50) {
+          container.scrollTop += 20
+        }
+      }, 100)
+      return () => clearInterval(scrollInterval)
+    }
+  }, [isStreaming, streamingContent])
 
   // Focus input when opened
   useEffect(() => {
@@ -148,8 +168,39 @@ export function AIChatWidget() {
     }
   }, [pathname, selectedText, showSelectedText, exerciseContext])
 
+  // Simulate typing effect
+  const simulateTyping = useCallback((fullText: string) => {
+    setIsStreaming(true)
+    setStreamingContent('')
+
+    let currentIndex = 0
+    const charsPerTick = 3 // Characters to add per interval
+    const intervalMs = 20 // Milliseconds between additions
+
+    const typeInterval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        const nextIndex = Math.min(currentIndex + charsPerTick, fullText.length)
+        setStreamingContent(fullText.slice(0, nextIndex))
+        currentIndex = nextIndex
+      } else {
+        clearInterval(typeInterval)
+        // Add the complete message to messages array
+        const assistantMessage: ChatMessage = {
+          role: 'assistant',
+          content: fullText,
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, assistantMessage])
+        setStreamingContent('')
+        setIsStreaming(false)
+      }
+    }, intervalMs)
+
+    return () => clearInterval(typeInterval)
+  }, [])
+
   const sendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading || isStreaming) return
 
     const userMessage = inputValue.trim()
     const context = getPageContext()
@@ -165,6 +216,9 @@ export function AIChatWidget() {
     setShowSelectedText(false)
     setExerciseContext(undefined)
     setIsLoading(true)
+
+    // Scroll to user message after a short delay
+    setTimeout(scrollToUserMessage, 50)
 
     try {
       const response = await fetch('/api/ai-chat', {
@@ -185,23 +239,19 @@ export function AIChatWidget() {
       }
 
       const data = await response.json()
+      setIsLoading(false)
 
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: data.response,
-        timestamp: new Date(),
-      }
-      setMessages(prev => [...prev, assistantMessage])
+      // Start typing effect
+      simulateTyping(data.response)
     } catch (error) {
       console.error('AI Chat error:', error)
+      setIsLoading(false)
       const errorMessage: ChatMessage = {
         role: 'assistant',
         content: 'Przepraszam, wystąpił błąd. Spróbuj ponownie.',
         timestamp: new Date(),
       }
       setMessages(prev => [...prev, errorMessage])
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -306,30 +356,49 @@ export function AIChatWidget() {
                 </p>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+              messages.map((message, index) => {
+                const isLastUserMessage = message.role === 'user' &&
+                  index === messages.map((m, i) => m.role === 'user' ? i : -1).filter(i => i >= 0).pop()
+
+                return (
                   <div
-                    className={`max-w-[85%] rounded-xl px-3 py-2 ${
-                      message.role === 'user'
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}
+                    key={index}
+                    ref={isLastUserMessage ? lastUserMessageRef : null}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    {message.role === 'assistant' ? (
-                      <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    )}
+                    <div
+                      className={`max-w-[85%] rounded-xl px-3 py-2 ${
+                        message.role === 'user'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {message.role === 'assistant' ? (
+                        <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
 
+            {/* Streaming content - typing effect */}
+            {isStreaming && streamingContent && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-xl px-3 py-2 bg-gray-100 text-gray-800">
+                  <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                    <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Loading dots - waiting for API */}
             {isLoading && (
               <div className="flex justify-start">
                 <div className="bg-gray-100 rounded-xl px-4 py-3">
@@ -358,7 +427,7 @@ export function AIChatWidget() {
               />
               <button
                 onClick={sendMessage}
-                disabled={!inputValue.trim() || isLoading}
+                disabled={!inputValue.trim() || isLoading || isStreaming}
                 className="px-3 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
