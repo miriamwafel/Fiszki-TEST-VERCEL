@@ -84,25 +84,40 @@ const getLocalDateKey = (date: Date) => {
 export function ReviewCalendar() {
   const [reviews, setReviews] = useState<ReviewItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchReviews()
-  }, [])
-
   const fetchReviews = async () => {
+    setError(null)
     try {
       const response = await fetch('/api/reviews')
       if (response.ok) {
         const data = await response.json()
         setReviews(data.reviews || [])
+      } else {
+        console.error('Failed to fetch reviews:', response.status)
+        setError('Nie udało się załadować powtórek')
       }
     } catch (error) {
       console.error('Failed to fetch reviews:', error)
+      setError('Błąd połączenia z serwerem')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchReviews()
+  }, [])
+
+  // Refetch when window gains focus (user returns to tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchReviews()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
 
   // Generuj 14 dni od dziś
   const days: Date[] = []
@@ -209,6 +224,31 @@ export function ReviewCalendar() {
         <div className="flex items-center gap-2 text-gray-500">
           <div className="w-4 h-4 border-2 border-gray-200 rounded-full animate-spin border-t-gray-500" />
           Ładowanie powtórek...
+        </div>
+      </Card>
+    )
+  }
+
+  // Błąd ładowania
+  if (error) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-600">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm">{error}</span>
+          </div>
+          <button
+            onClick={() => {
+              setLoading(true)
+              fetchReviews()
+            }}
+            className="text-sm text-primary-600 hover:underline"
+          >
+            Spróbuj ponownie
+          </button>
         </div>
       </Card>
     )
