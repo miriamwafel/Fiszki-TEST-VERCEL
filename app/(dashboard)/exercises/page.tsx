@@ -625,8 +625,23 @@ export default function ExercisesPage() {
                 )}
               </div>
 
-              <p className="text-sm text-gray-500 mb-3 flex items-center gap-2">
-                Słowo: <span className="font-medium">{flashcards.find(f => f.id === exercise.flashcardId)?.translation}</span>
+              <div className="mb-3 flex items-center gap-2">
+                {exercise.hintVisible ? (
+                  <p className="text-sm text-gray-500">
+                    Słowo: <span className="font-medium">{flashcards.find(f => f.id === exercise.flashcardId)?.translation}</span>
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => toggleGapHint(index)}
+                    className="text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    Pokaż podpowiedź
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     const flashcard = flashcards.find(f => f.id === exercise.flashcardId)
@@ -649,7 +664,7 @@ export default function ExercisesPage() {
                   </svg>
                   AI
                 </button>
-              </p>
+              </div>
 
               <p className="text-lg text-gray-700 mb-2">
                 {exercise.sentence.split('_____')[0]}
@@ -673,26 +688,6 @@ export default function ExercisesPage() {
                 />
                 {exercise.sentence.split('_____')[1]}
               </p>
-
-              {!exercise.checked && (
-                <div className="mb-3">
-                  {exercise.hintVisible ? (
-                    <p className="text-xs text-gray-400 italic">
-                      Podpowiedź: {exercise.hint}
-                    </p>
-                  ) : (
-                    <button
-                      onClick={() => toggleGapHint(index)}
-                      className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1 transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Pokaż podpowiedź
-                    </button>
-                  )}
-                </div>
-              )}
 
               {!exercise.checked && (
                 <Button size="sm" onClick={() => checkGapAnswer(index)}>
