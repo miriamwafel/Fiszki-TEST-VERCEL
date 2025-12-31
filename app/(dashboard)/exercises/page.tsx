@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/Button'
 import { Select } from '@/components/Select'
 import { Card } from '@/components/Card'
+import { openAIChat } from '@/components/AIChatWidget'
 
 interface FlashcardSet {
   id: string
@@ -615,8 +616,30 @@ export default function ExercisesPage() {
                 )}
               </div>
 
-              <p className="text-sm text-gray-500 mb-3">
+              <p className="text-sm text-gray-500 mb-3 flex items-center gap-2">
                 Słowo: <span className="font-medium">{flashcards.find(f => f.id === exercise.flashcardId)?.translation}</span>
+                <button
+                  onClick={() => {
+                    const flashcard = flashcards.find(f => f.id === exercise.flashcardId)
+                    if (flashcard) {
+                      openAIChat(
+                        `Wyjaśnij słówko "${exercise.word}" (${flashcard.translation}). Podaj przykłady użycia i kontekst.`,
+                        {
+                          word: exercise.word,
+                          translation: flashcard.translation,
+                          sentence: exercise.sentence.replace('_____', exercise.word),
+                        }
+                      )
+                    }
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 transition-colors"
+                  title="Zapytaj AI o to słówko"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  AI
+                </button>
               </p>
 
               <p className="text-lg text-gray-700 mb-2">
@@ -733,6 +756,26 @@ export default function ExercisesPage() {
                 <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm">
                   ({sentenceExercises[currentSentenceIndex].translation})
                 </span>
+                <button
+                  onClick={() => {
+                    const ex = sentenceExercises[currentSentenceIndex]
+                    openAIChat(
+                      `Wyjaśnij słówko "${ex.targetWord}" (${ex.translation}). Jak użyć go w zdaniu?`,
+                      {
+                        word: ex.targetWord,
+                        translation: ex.translation,
+                        sentence: ex.exampleSentence,
+                      }
+                    )
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full hover:bg-indigo-200 transition-colors"
+                  title="Zapytaj AI o to słówko"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  AI
+                </button>
                 {sentenceExercises[currentSentenceIndex].contextWords.map((word, i) => (
                   <span key={i} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
                     {word}

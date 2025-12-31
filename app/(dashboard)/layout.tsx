@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { Navbar } from '@/components/Navbar'
 import { PrefetchProvider } from '@/components/PrefetchProvider'
 import { StickyNotesWidget } from '@/components/StickyNotesWidget'
+import { AIChatWidget } from '@/components/AIChatWidget'
 
 export default async function DashboardLayout({
   children,
@@ -25,6 +26,7 @@ export default async function DashboardLayout({
         </main>
       </PrefetchProvider>
       <StickyNotesWidget />
+      <AIChatWidget />
     </div>
   )
 }
