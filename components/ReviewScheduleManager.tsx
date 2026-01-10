@@ -78,42 +78,31 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   }
 
   const markCompleted = async (reviewId: string) => {
-    console.log('[markCompleted] Start:', { reviewId, setId })
-
     // Optimistic update
-    const previousReviews = [...reviews]
-    setReviews(reviews.map(r =>
+    setReviews(prev => prev.map(r =>
       r.id === reviewId ? { ...r, completed: true, completedAt: new Date().toISOString() } : r
     ))
 
     try {
-      const url = `/api/sets/${setId}/reviews`
-      console.log('[markCompleted] Wysyłam PUT do:', url)
-
-      const response = await fetch(url, {
+      const response = await fetch(`/api/sets/${setId}/reviews`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewId, completed: true }),
       })
 
-      console.log('[markCompleted] Response status:', response.status, response.ok)
-
       if (response.ok) {
-        const data = await response.json()
-        console.log('[markCompleted] Sukces! Dane:', data)
+        // Pobierz świeże dane z serwera żeby mieć pewność synchronizacji
+        await fetchReviews()
         // Emit event dla innych komponentów (np. ReviewCalendar)
         emitReviewsUpdated({ type: 'completed', reviewId, setId })
       } else {
-        // Revert on failure
-        const errorData = await response.json().catch(() => ({}))
-        console.error('[markCompleted] Błąd API:', response.status, errorData)
-        setReviews(previousReviews)
-        alert(`Nie udało się oznaczyć jako ukończone (${response.status}). ${errorData.error || ''}`)
+        // Revert - pobierz dane z serwera
+        await fetchReviews()
+        alert('Nie udało się oznaczyć jako ukończone. Spróbuj ponownie.')
       }
-    } catch (error) {
-      // Revert on error
-      console.error('[markCompleted] Wyjątek:', error)
-      setReviews(previousReviews)
+    } catch {
+      // Revert - pobierz dane z serwera
+      await fetchReviews()
       alert('Błąd połączenia. Spróbuj ponownie.')
     }
   }

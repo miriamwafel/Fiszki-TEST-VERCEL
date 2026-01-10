@@ -78,8 +78,7 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
 
   const markCompleted = async (reviewId: string) => {
     // Optimistic update
-    const previousReviews = [...reviews]
-    setReviews(reviews.map(r =>
+    setReviews(prev => prev.map(r =>
       r.id === reviewId ? { ...r, completed: true, completedAt: new Date().toISOString() } : r
     ))
 
@@ -91,17 +90,17 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
       })
 
       if (response.ok) {
+        // Pobierz świeże dane z serwera
+        await fetchReviews()
         emitReviewsUpdated({ type: 'completed', reviewId })
       } else {
-        // Revert on failure
-        setReviews(previousReviews)
-        console.error('Failed to mark review as completed:', response.status)
+        // Revert - pobierz dane z serwera
+        await fetchReviews()
         alert('Nie udało się oznaczyć jako ukończone. Spróbuj ponownie.')
       }
-    } catch (error) {
-      // Revert on error
-      setReviews(previousReviews)
-      console.error('Failed to mark review as completed:', error)
+    } catch {
+      // Revert - pobierz dane z serwera
+      await fetchReviews()
       alert('Błąd połączenia. Spróbuj ponownie.')
     }
   }

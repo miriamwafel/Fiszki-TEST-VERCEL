@@ -177,17 +177,12 @@ export async function PUT(
     const { id: setId } = await params
 
     if (!session?.user?.id) {
-      console.error('[PUT reviews] Unauthorized - brak sesji')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { reviewId, scheduledDate, completed } = body
-
-    console.log('[PUT reviews] Request:', { setId, reviewId, completed, userId: session.user.id })
+    const { reviewId, scheduledDate, completed } = await request.json()
 
     if (!reviewId) {
-      console.error('[PUT reviews] Brak reviewId')
       return NextResponse.json({ error: 'reviewId jest wymagane' }, { status: 400 })
     }
 
@@ -201,19 +196,6 @@ export async function PUT(
     })
 
     if (!review) {
-      // Debug: sprawdź czy review w ogóle istnieje
-      const anyReview = await prisma.reviewSchedule.findUnique({
-        where: { id: reviewId },
-        include: { set: true },
-      })
-      console.error('[PUT reviews] Review nie znaleziony!', {
-        reviewId,
-        setIdFromUrl: setId,
-        reviewExists: !!anyReview,
-        actualSetId: anyReview?.setId,
-        actualUserId: anyReview?.set?.userId,
-        requestUserId: session.user.id,
-      })
       return NextResponse.json({ error: 'Powtórka nie znaleziona' }, { status: 404 })
     }
 
@@ -228,18 +210,14 @@ export async function PUT(
       updateData.completedAt = completed ? new Date() : null
     }
 
-    console.log('[PUT reviews] Aktualizuję:', { reviewId, updateData })
-
     const updatedReview = await prisma.reviewSchedule.update({
       where: { id: reviewId },
       data: updateData,
     })
 
-    console.log('[PUT reviews] Zaktualizowano:', updatedReview)
-
     return NextResponse.json(updatedReview)
   } catch (error) {
-    console.error('[PUT reviews] Error:', error)
+    console.error('Update review error:', error)
     return NextResponse.json({ error: 'Wystąpił błąd' }, { status: 500 })
   }
 }
