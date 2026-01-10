@@ -32,12 +32,24 @@ const languageFlags: Record<string, string> = {
 
 const supportedLanguages = ['en', 'de', 'es', 'fr', 'it']
 
+// Domyślne wartości CEFR
+const DEFAULT_CEFR_TARGETS: Record<string, number> = {
+  A1: 300,
+  A2: 500,
+  B1: 600,
+  B2: 400,
+  C1: 150,
+  C2: 50,
+}
+
 export default function VocabularyIndexPage() {
   const [languages, setLanguages] = useState<LanguageStats[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
   const [generatingFull, setGeneratingFull] = useState<string | null>(null)
+  const [cefrTargets, setCefrTargets] = useState<Record<string, number>>(DEFAULT_CEFR_TARGETS)
+  const [editingCefr, setEditingCefr] = useState(false)
 
   const fetchLanguages = async () => {
     try {
@@ -81,7 +93,23 @@ export default function VocabularyIndexPage() {
       }
     }
     checkAdmin()
+
+    // Załaduj zapisane targety CEFR z localStorage
+    const savedTargets = localStorage.getItem('cefrTargets')
+    if (savedTargets) {
+      try {
+        setCefrTargets(JSON.parse(savedTargets))
+      } catch {
+        // Ignoruj błędy parsowania
+      }
+    }
   }, [])
+
+  // Zapisz targety do localStorage przy zmianie
+  const saveCefrTargets = (targets: Record<string, number>) => {
+    setCefrTargets(targets)
+    localStorage.setItem('cefrTargets', JSON.stringify(targets))
+  }
 
   const generateVocabulary = async (language: string, level: string) => {
     if (generating) return
@@ -148,21 +176,19 @@ export default function VocabularyIndexPage() {
   const generateLevelVocabulary = async (language: string, level: string) => {
     if (generating || generatingFull) return
 
-    const cefrTargets: Record<string, number> = {
-      A1: 300, A2: 500, B1: 600, B2: 400, C1: 150, C2: 50
-    }
+    const targetCount = cefrTargets[level] || 100
 
     setGenerating(`${language}-${level}`)
-    toast.info(`Generuję ${languageNames[language]} poziom ${level} (~${cefrTargets[level]} słów)...`, {
+    toast.info(`Generuję ${languageNames[language]} poziom ${level} (do ${targetCount} słów)...`, {
       duration: 60000,
-      description: 'Może potrwać 1-2 minuty.',
+      description: 'Uzupełnia brakujące słowa. Może potrwać 1-2 minuty.',
     })
 
     try {
       const response = await fetch(`/api/vocabulary/${language}/generate-full`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ level }),
+        body: JSON.stringify({ level, targetCount }),
       })
 
       if (response.ok) {
@@ -214,17 +240,77 @@ export default function VocabularyIndexPage() {
             <span>⚙️</span> Panel admina - Wygeneruj bazę słownictwa
           </h2>
 
-          {/* Info o CEFR */}
+          {/* Edytowalne targety CEFR */}
           <div className="mb-4 p-3 bg-white rounded-lg border border-purple-200 text-sm">
-            <p className="font-medium text-purple-900 mb-2">Rozkład CEFR (~2000 słów):</p>
-            <div className="grid grid-cols-6 gap-1 text-center text-xs">
-              <div className="bg-green-100 p-1 rounded"><span className="font-bold">A1</span><br/>300</div>
-              <div className="bg-green-200 p-1 rounded"><span className="font-bold">A2</span><br/>500</div>
-              <div className="bg-yellow-100 p-1 rounded"><span className="font-bold">B1</span><br/>600</div>
-              <div className="bg-yellow-200 p-1 rounded"><span className="font-bold">B2</span><br/>400</div>
-              <div className="bg-orange-100 p-1 rounded"><span className="font-bold">C1</span><br/>150</div>
-              <div className="bg-orange-200 p-1 rounded"><span className="font-bold">C2</span><br/>50</div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-medium text-purple-900">
+                Docelowa liczba słów per poziom (suma: {Object.values(cefrTargets).reduce((a, b) => a + b, 0)}):
+              </p>
+              <div className="flex gap-2">
+                {editingCefr ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        saveCefrTargets(DEFAULT_CEFR_TARGETS)
+                        setEditingCefr(false)
+                      }}
+                      className="text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={() => setEditingCefr(false)}
+                      className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                    >
+                      Zapisz
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setEditingCefr(true)}
+                    className="text-xs text-purple-600 hover:text-purple-800"
+                  >
+                    ✏️ Edytuj
+                  </button>
+                )}
+              </div>
             </div>
+            <div className="grid grid-cols-6 gap-1 text-center text-xs">
+              {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((level) => {
+                const bgColors: Record<string, string> = {
+                  A1: 'bg-green-100',
+                  A2: 'bg-green-200',
+                  B1: 'bg-yellow-100',
+                  B2: 'bg-yellow-200',
+                  C1: 'bg-orange-100',
+                  C2: 'bg-orange-200',
+                }
+                return (
+                  <div key={level} className={`${bgColors[level]} p-1 rounded`}>
+                    <span className="font-bold">{level}</span>
+                    <br />
+                    {editingCefr ? (
+                      <input
+                        type="number"
+                        value={cefrTargets[level]}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0
+                          saveCefrTargets({ ...cefrTargets, [level]: val })
+                        }}
+                        className="w-full text-center bg-white/50 rounded border border-gray-300 text-xs p-0.5"
+                        min={0}
+                        max={2000}
+                      />
+                    ) : (
+                      <span>{cefrTargets[level]}</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              💡 Kliknij poziom poniżej aby uzupełnić brakujące słowa do podanej liczby
+            </p>
           </div>
 
           {/* Generowanie pełnej bazy */}

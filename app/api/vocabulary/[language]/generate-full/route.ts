@@ -58,11 +58,13 @@ export async function POST(
       return NextResponse.json({ error: 'Admin only' }, { status: 403 })
     }
 
-    // Opcjonalnie: generuj tylko jeden poziom
+    // Opcjonalnie: generuj tylko jeden poziom lub z custom targetCount
     let targetLevel: string | null = null
+    let customTargetCount: number | null = null
     try {
       const body = await request.json()
       targetLevel = body?.level || null
+      customTargetCount = body?.targetCount ? parseInt(body.targetCount) : null
     } catch {
       // Brak body = generuj wszystkie poziomy
     }
@@ -87,7 +89,8 @@ export async function POST(
     let globalRank = (maxRankRecord?.frequencyRank || 0) + 1
 
     for (const level of levels) {
-      const targetCount = CEFR_DISTRIBUTION[level] || 100
+      // Użyj custom targetCount jeśli podany (dla pojedynczego poziomu), lub domyślny CEFR
+      const targetCount = (targetLevel && customTargetCount) ? customTargetCount : (CEFR_DISTRIBUTION[level] || 100)
       results.byLevel[level] = { created: 0, skipped: 0, target: targetCount }
 
       // Sprawdź ile słów już mamy dla tego poziomu
