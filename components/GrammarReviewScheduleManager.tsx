@@ -31,7 +31,8 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
   const fetchReviews = useCallback(async () => {
     setError(null)
     try {
-      const response = await fetch(`/api/grammar/${moduleId}/reviews`, { cache: 'no-store' })
+      // cache: 'no-store' + timestamp wymusza świeże dane
+      const response = await fetch(`/api/grammar/${moduleId}/reviews?_t=${Date.now()}`, { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setReviews(data)

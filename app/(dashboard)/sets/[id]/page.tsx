@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { SetView } from './SetView'
 
+// Wymuś dynamiczne renderowanie - zawsze świeże dane
+export const dynamic = 'force-dynamic'
+
 export default async function SetPage({
   params,
 }: {
