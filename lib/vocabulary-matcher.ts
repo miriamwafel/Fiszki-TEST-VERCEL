@@ -319,14 +319,14 @@ export async function getUnknownWords(
   // Pobieraj słowa poziom po poziomie, zaczynając od A1
   const result: Array<{ word: string; translation: string; frequencyRank: number; level: string }> = []
 
-  for (const level of levelsToInclude) {
+  for (const currentLevel of levelsToInclude) {
     if (result.length >= count) break
 
     const remaining = count - result.length
     const words = await prisma.vocabularyBase.findMany({
       where: {
         language,
-        level,
+        level: currentLevel,
         id: { notIn: knownIds },
       },
       orderBy: { frequencyRank: 'asc' },
@@ -339,7 +339,13 @@ export async function getUnknownWords(
       },
     })
 
-    result.push(...words)
+    // Map to ensure level is string (we know it's not null since we filtered by level)
+    result.push(...words.map(w => ({
+      word: w.word,
+      translation: w.translation,
+      frequencyRank: w.frequencyRank,
+      level: w.level || currentLevel, // Fallback to currentLevel if null
+    })))
   }
 
   return result
