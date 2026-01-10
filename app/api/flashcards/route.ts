@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
+import { markWordAsLearning } from '@/lib/vocabulary-matcher'
 
 export async function POST(request: Request) {
   try {
@@ -42,6 +43,19 @@ export async function POST(request: Request) {
         setId,
       },
     })
+
+    // Automatycznie oznacz słowo w bazie słownictwa jako "w nauce"
+    // Robimy to asynchronicznie żeby nie blokować odpowiedzi
+    markWordAsLearning(session.user.id, word, set.language, flashcard.id).catch((err) => {
+      console.error('Failed to mark word in vocabulary base:', err)
+    })
+
+    // Jeśli jest bezokolicznik, oznacz też jego
+    if (infinitive && infinitive !== word) {
+      markWordAsLearning(session.user.id, infinitive, set.language, flashcard.id).catch((err) => {
+        console.error('Failed to mark infinitive in vocabulary base:', err)
+      })
+    }
 
     return NextResponse.json(flashcard)
   } catch (error) {

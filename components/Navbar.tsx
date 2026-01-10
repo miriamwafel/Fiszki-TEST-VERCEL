@@ -31,6 +31,7 @@ export function Navbar() {
     { href: '/stories', label: 'Historyjki' },
     { href: '/sets', label: 'Zestawy' },
     { href: '/grammar', label: 'Gramatyka' },
+    { href: '/vocabulary', label: 'Słownictwo' },
     { href: '/exercises', label: 'Ćwiczenia' },
     { href: '/notes', label: 'Notatki' },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', admin: true }] : []),

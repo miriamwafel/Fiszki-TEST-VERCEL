@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { generateStory } from '@/lib/gemini'
 import prisma from '@/lib/db'
+import { getUnknownWords } from '@/lib/vocabulary-matcher'
 
 export async function GET() {
   try {
@@ -68,8 +69,28 @@ export async function POST(request: Request) {
 
     const languageName = languageNames[language] || language
 
+    // Pobierz nieznane słowa z bazy słownictwa dla tego poziomu
+    let targetWords: string[] = []
+    try {
+      const unknownWords = await getUnknownWords(
+        session.user.id,
+        language,
+        10, // Max 10 słów do włączenia w historię
+        difficulty // Filtruj po poziomie trudności
+      )
+      targetWords = unknownWords.map(w => `${w.word} (${w.translation})`)
+    } catch (err) {
+      console.error('Failed to get unknown words:', err)
+      // Kontynuuj bez target words jeśli baza słownictwa jest pusta
+    }
+
+    // Rozszerz topic o słowa do nauczenia
+    const enrichedTopic = targetWords.length > 0
+      ? `${topic || 'dowolny temat'}. WAŻNE: Historia MUSI zawierać następujące słowa: ${targetWords.join(', ')}`
+      : topic
+
     // Generuj historię RAZEM ze słowniczkiem (lepsza jakość!)
-    const storyResult = await generateStory(languageName, wordCount, difficulty, topic)
+    const storyResult = await generateStory(languageName, wordCount, difficulty, enrichedTopic)
 
     const story = await prisma.story.create({
       data: {

@@ -24,6 +24,7 @@ model User {
   grammarProgress   UserGrammarProgress[]
   grammarReviews    GrammarReviewSchedule[]
   stickyNotes       StickyNote[]
+  vocabularyProgress UserVocabularyProgress[]
 }
 
 // Ustawienia użytkownika (domyślne dni powtórek itp.)
@@ -200,4 +201,61 @@ model StickyNote {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// ============================================
+// BAZA SŁOWNICTWA (Vocabulary Base)
+// ============================================
+
+// Baza najważniejszych słów dla danego języka
+// Generowana przez AI, zawiera ~1000-3000 najczęstszych słów
+model VocabularyBase {
+  id              String   @id @default(cuid())
+  language        String   // en, de, es, fr, it
+  word            String   // słowo w języku obcym (forma podstawowa)
+  translation     String   // tłumaczenie na polski
+  frequencyRank   Int      // pozycja na liście częstotliwości (1 = najczęstsze)
+  level           String?  // sugerowany poziom: A1, A2, B1, B2, C1, C2
+  partOfSpeech    String?  // noun, verb, adjective, adverb, etc.
+  category        String?  // kategoria tematyczna: food, travel, work, etc.
+  example         String?  // przykładowe zdanie
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Postęp użytkowników
+  userProgress    UserVocabularyProgress[]
+
+  @@unique([language, word])
+  @@index([language])
+  @@index([language, frequencyRank])
+  @@index([language, level])
+}
+
+// Postęp użytkownika w nauce słówek z bazy
+model UserVocabularyProgress {
+  id              String   @id @default(cuid())
+  status          String   @default("unknown") // unknown, learning, known
+
+  // Źródło nauki (skąd użytkownik poznał słówko)
+  source          String?  // manual, flashcard, story, exercise
+  sourceId        String?  // ID fiszki/historii która nauczyła słówka
+
+  // Daty
+  firstSeenAt     DateTime @default(now())
+  learnedAt       DateTime? // kiedy oznaczono jako "known"
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  vocabularyId    String
+  vocabulary      VocabularyBase @relation(fields: [vocabularyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabularyId])
+  @@index([userId])
+  @@index([userId, status])
+  @@index([vocabularyId])
 }
