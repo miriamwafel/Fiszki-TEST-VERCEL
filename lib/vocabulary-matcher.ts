@@ -30,87 +30,117 @@ function normalizeWord(word: string): string {
 
 /**
  * Próbuje znaleźć formę podstawową słowa (prosty algorytm)
+ * Zwraca formy zarówno z akcentami jak i bez
  */
 function getBaseForms(word: string, language: string): string[] {
   const normalized = normalizeWord(word)
-  const forms = [normalized]
+  const originalLower = word.toLowerCase().trim()
+  const forms: string[] = []
 
-  // Reguły dla różnych języków
-  if (language === 'es') {
-    // Hiszpański - czasowniki
-    if (normalized.endsWith('ando') || normalized.endsWith('iendo')) {
-      // gerund → infinitive
-      forms.push(normalized.replace(/ando$/, 'ar'))
-      forms.push(normalized.replace(/iendo$/, 'er'))
-      forms.push(normalized.replace(/iendo$/, 'ir'))
-    }
-    if (normalized.endsWith('ado') || normalized.endsWith('ido')) {
-      // past participle → infinitive
-      forms.push(normalized.replace(/ado$/, 'ar'))
-      forms.push(normalized.replace(/ido$/, 'er'))
-      forms.push(normalized.replace(/ido$/, 'ir'))
-    }
-    // Rzeczowniki - liczba mnoga
-    if (normalized.endsWith('es')) {
-      forms.push(normalized.slice(0, -2))
-      forms.push(normalized.slice(0, -2) + 'a') // niñes → niño
-    }
-    if (normalized.endsWith('s') && !normalized.endsWith('es')) {
-      forms.push(normalized.slice(0, -1))
+  // Dodaj obie wersje słowa
+  if (originalLower !== normalized) {
+    forms.push(originalLower)
+  }
+  forms.push(normalized)
+
+  // Pomocnicza funkcja do dodawania form z i bez akcentów
+  const addForm = (form: string) => {
+    forms.push(form)
+    const normalizedForm = normalizeWord(form)
+    if (normalizedForm !== form) {
+      forms.push(normalizedForm)
     }
   }
 
-  if (language === 'en') {
-    // Angielski - czasowniki
-    if (normalized.endsWith('ing')) {
-      forms.push(normalized.slice(0, -3))
-      forms.push(normalized.slice(0, -3) + 'e') // making → make
+  // Reguły dla różnych języków - aplikuj do OBU wersji (z akcentami i bez)
+  const applyRules = (baseWord: string) => {
+    if (language === 'es') {
+      // Hiszpański - czasowniki
+      if (baseWord.endsWith('ando') || baseWord.endsWith('iendo')) {
+        addForm(baseWord.replace(/ando$/, 'ar'))
+        addForm(baseWord.replace(/iendo$/, 'er'))
+        addForm(baseWord.replace(/iendo$/, 'ir'))
+      }
+      if (baseWord.endsWith('ado') || baseWord.endsWith('ido')) {
+        addForm(baseWord.replace(/ado$/, 'ar'))
+        addForm(baseWord.replace(/ido$/, 'er'))
+        addForm(baseWord.replace(/ido$/, 'ir'))
+      }
+      // Rzeczowniki/przymiotniki - liczba mnoga
+      if (baseWord.endsWith('es') && baseWord.length > 3) {
+        addForm(baseWord.slice(0, -2))
+        addForm(baseWord.slice(0, -2) + 'a')
+        addForm(baseWord.slice(0, -2) + 'o')
+      }
+      if (baseWord.endsWith('s') && !baseWord.endsWith('es') && baseWord.length > 2) {
+        addForm(baseWord.slice(0, -1)) // pequeños → pequeño
+      }
+      // Przymiotniki - rodzaj żeński → męski
+      if (baseWord.endsWith('a') && baseWord.length > 2) {
+        addForm(baseWord.slice(0, -1) + 'o') // pequeña → pequeño
+      }
+      if (baseWord.endsWith('as') && baseWord.length > 3) {
+        addForm(baseWord.slice(0, -2) + 'o') // pequeñas → pequeño
+      }
+      if (baseWord.endsWith('os') && baseWord.length > 3) {
+        addForm(baseWord.slice(0, -2) + 'o') // pequeños → pequeño
+      }
     }
-    if (normalized.endsWith('ed')) {
-      forms.push(normalized.slice(0, -2))
-      forms.push(normalized.slice(0, -1)) // liked → like
+
+    if (language === 'en') {
+      if (baseWord.endsWith('ing')) {
+        addForm(baseWord.slice(0, -3))
+        addForm(baseWord.slice(0, -3) + 'e')
+      }
+      if (baseWord.endsWith('ed')) {
+        addForm(baseWord.slice(0, -2))
+        addForm(baseWord.slice(0, -1))
+      }
+      if (baseWord.endsWith('s') && !baseWord.endsWith('ss') && baseWord.length > 2) {
+        addForm(baseWord.slice(0, -1))
+      }
+      if (baseWord.endsWith('ies')) {
+        addForm(baseWord.slice(0, -3) + 'y')
+      }
     }
-    if (normalized.endsWith('s') && !normalized.endsWith('ss')) {
-      forms.push(normalized.slice(0, -1))
+
+    if (language === 'de') {
+      if (baseWord.endsWith('en')) {
+        addForm(baseWord.slice(0, -1))
+      }
+      if (baseWord.endsWith('t')) {
+        addForm(baseWord.slice(0, -1) + 'en')
+      }
     }
-    if (normalized.endsWith('ies')) {
-      forms.push(normalized.slice(0, -3) + 'y') // cities → city
+
+    if (language === 'fr') {
+      if (baseWord.endsWith('s') && !baseWord.endsWith('ss') && baseWord.length > 2) {
+        addForm(baseWord.slice(0, -1))
+      }
+      if (baseWord.endsWith('ant') || baseWord.endsWith('ent')) {
+        addForm(baseWord.slice(0, -3) + 'er')
+        addForm(baseWord.slice(0, -3) + 'ir')
+        addForm(baseWord.slice(0, -3) + 're')
+      }
+    }
+
+    if (language === 'it') {
+      if (baseWord.endsWith('ando') || baseWord.endsWith('endo')) {
+        addForm(baseWord.replace(/ando$/, 'are'))
+        addForm(baseWord.replace(/endo$/, 'ere'))
+        addForm(baseWord.replace(/endo$/, 'ire'))
+      }
+      if (baseWord.endsWith('i') && baseWord.length > 2) {
+        addForm(baseWord.slice(0, -1) + 'o')
+        addForm(baseWord.slice(0, -1) + 'e')
+      }
     }
   }
 
-  if (language === 'de') {
-    // Niemiecki
-    if (normalized.endsWith('en')) {
-      forms.push(normalized.slice(0, -1)) // machen → mache
-    }
-    if (normalized.endsWith('t')) {
-      forms.push(normalized.slice(0, -1) + 'en') // macht → machen
-    }
-  }
-
-  if (language === 'fr') {
-    // Francuski
-    if (normalized.endsWith('s') && !normalized.endsWith('ss')) {
-      forms.push(normalized.slice(0, -1))
-    }
-    if (normalized.endsWith('ant') || normalized.endsWith('ent')) {
-      forms.push(normalized.slice(0, -3) + 'er')
-      forms.push(normalized.slice(0, -3) + 'ir')
-      forms.push(normalized.slice(0, -3) + 're')
-    }
-  }
-
-  if (language === 'it') {
-    // Włoski
-    if (normalized.endsWith('ando') || normalized.endsWith('endo')) {
-      forms.push(normalized.replace(/ando$/, 'are'))
-      forms.push(normalized.replace(/endo$/, 'ere'))
-      forms.push(normalized.replace(/endo$/, 'ire'))
-    }
-    if (normalized.endsWith('i') && normalized.length > 2) {
-      forms.push(normalized.slice(0, -1) + 'o') // libri → libro
-      forms.push(normalized.slice(0, -1) + 'e') // cani → cane
-    }
+  // Aplikuj reguły do obu wersji słowa
+  applyRules(originalLower)
+  if (originalLower !== normalized) {
+    applyRules(normalized)
   }
 
   return [...new Set(forms)] // Usuń duplikaty
