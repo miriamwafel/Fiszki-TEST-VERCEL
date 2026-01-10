@@ -110,11 +110,26 @@ export async function GET(
       _count: true,
     })
 
+    // Statystyki per poziom
+    const levelCounts = await prisma.vocabularyBase.groupBy({
+      by: ['level'],
+      where: { language },
+      _count: true,
+    })
+
+    const levelStats: Record<string, number> = {}
+    for (const lc of levelCounts) {
+      if (lc.level) {
+        levelStats[lc.level] = lc._count
+      }
+    }
+
     const stats = {
       total: totalCount,
-      unknown: totalCount - progressCounts.reduce((acc, p) => acc + p._count, 0),
-      learning: progressCounts.find(p => p.status === 'learning')?._count || 0,
-      known: progressCounts.find(p => p.status === 'known')?._count || 0,
+      unknown: totalCount - progressCounts.reduce((acc: number, p: { _count: number }) => acc + p._count, 0),
+      learning: progressCounts.find((p: { status: string }) => p.status === 'learning')?._count || 0,
+      known: progressCounts.find((p: { status: string }) => p.status === 'known')?._count || 0,
+      byLevel: levelStats, // { A1: 300, A2: 255, ... }
     }
 
     return NextResponse.json({

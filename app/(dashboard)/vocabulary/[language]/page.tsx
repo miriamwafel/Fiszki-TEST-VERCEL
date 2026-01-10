@@ -29,6 +29,7 @@ interface Stats {
   unknown: number
   learning: number
   known: number
+  byLevel?: Record<string, number> // { A1: 300, A2: 255, ... }
 }
 
 const languageNames: Record<string, string> = {
@@ -294,6 +295,36 @@ export default function VocabularyPage({ params }: { params: Promise<{ language:
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 bg-gray-200 rounded" /> Nieznane
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* Level breakdown */}
+      {stats?.byLevel && Object.keys(stats.byLevel).length > 0 && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="text-sm font-medium text-gray-700 mb-3">Słowa według poziomu:</div>
+          <div className="grid grid-cols-6 gap-2 text-center text-sm">
+            {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map((level) => {
+              const count = stats.byLevel?.[level] || 0
+              const bgColors: Record<string, string> = {
+                A1: 'bg-green-100 border-green-300',
+                A2: 'bg-green-200 border-green-400',
+                B1: 'bg-yellow-100 border-yellow-300',
+                B2: 'bg-yellow-200 border-yellow-400',
+                C1: 'bg-orange-100 border-orange-300',
+                C2: 'bg-orange-200 border-orange-400',
+              }
+              return (
+                <div
+                  key={level}
+                  className={`${bgColors[level]} p-2 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity`}
+                  onClick={() => setLevelFilter(levelFilter === level ? 'all' : level)}
+                >
+                  <div className="font-bold text-gray-800">{level}</div>
+                  <div className="text-lg font-semibold text-gray-700">{count}</div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

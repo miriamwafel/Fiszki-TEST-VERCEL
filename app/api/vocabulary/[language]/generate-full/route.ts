@@ -107,23 +107,30 @@ export async function POST(
 
       console.log(`Level ${level}: need ${neededCount} more words (have ${existingCount}, target: ${targetCount})`)
 
-      // Ile batch'y potrzebujemy
-      const batches = Math.ceil(neededCount / BATCH_SIZE)
+      // Pobierz WSZYSTKIE istniejące słowa dla tego języka (raz, przed generowaniem)
+      const existingWords = await prisma.vocabularyBase.findMany({
+        where: { language },
+        select: { word: true },
+      })
+      const existingSet = new Set(existingWords.map((w: { word: string }) => w.word.toLowerCase()))
 
-      for (let batch = 0; batch < batches; batch++) {
-        const batchSize = Math.min(BATCH_SIZE, neededCount - batch * BATCH_SIZE)
-        if (batchSize <= 0) break
+      // Ile słów jeszcze potrzebujemy (śledzimy dynamicznie)
+      let stillNeeded = neededCount
+      let batchAttempts = 0
+      const maxAttempts = 10 // Zabezpieczenie przed nieskończoną pętlą
 
-        // Pobierz już istniejące słowa dla tego języka żeby ich nie powtarzać
-        const existingWords = await prisma.vocabularyBase.findMany({
-          where: { language },
-          select: { word: true },
-        })
-        const existingSet = new Set(existingWords.map((w: { word: string }) => w.word.toLowerCase()))
+      while (stillNeeded > 0 && batchAttempts < maxAttempts) {
+        batchAttempts++
+        // Generuj trochę więcej niż potrzeba (buffer na duplikaty)
+        const batchSize = Math.min(BATCH_SIZE, Math.ceil(stillNeeded * 1.3))
 
-        const prompt = `Wygeneruj listę ${batchSize} słów w języku ${langName} dla poziomu ${level}.
+        // Pokaż AI przykłady istniejących słów żeby ich unikał
+        const existingSample = Array.from(existingSet).slice(0, 100).join(', ')
+        const excludeNote = existingSet.size > 0
+          ? `\n\nUNIKAJ tych słów (już istnieją w bazie): ${existingSample}${existingSet.size > 100 ? '... i więcej' : ''}`
+          : ''
 
-${batch > 0 ? `To jest część ${batch + 1} - wygeneruj INNE słowa niż wcześniej.` : ''}
+        const prompt = `Wygeneruj listę ${batchSize} UNIKALNYCH słów w języku ${langName} dla poziomu ${level}.
 
 Zwróć JSON array z obiektami:
 [
@@ -144,8 +151,8 @@ Zasady:
 - Rzeczowniki w liczbie pojedynczej
 - Sortuj od najczęściej używanych
 - Tłumaczenia po polsku
-- NIE powtarzaj słów
-- Przykłady naturalne dla poziomu ${level}
+- Każde słowo MUSI być unikalne
+- Przykłady naturalne dla poziomu ${level}${excludeNote}
 
 Zwróć TYLKO JSON array.`
 
@@ -165,12 +172,15 @@ Zwróć TYLKO JSON array.`
             const jsonStr = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
             words = JSON.parse(jsonStr)
           } catch {
-            console.error(`Failed to parse AI response for ${level} batch ${batch}`)
+            console.error(`Failed to parse AI response for ${level} attempt ${batchAttempts}`)
             continue
           }
 
-          // Zapisz słowa do bazy
+          // Zapisz słowa do bazy - liczymy ile faktycznie dodaliśmy
+          let addedInThisBatch = 0
           for (const w of words) {
+            if (stillNeeded <= 0) break // Mamy już wystarczająco
+
             const wordLower = w.word.toLowerCase().trim()
 
             // Pomiń jeśli już istnieje
@@ -193,20 +203,24 @@ Zwróć TYLKO JSON array.`
                   example: w.example,
                 },
               })
-              existingSet.add(wordLower)
+              existingSet.add(wordLower) // Dodaj do setu żeby nie powtarzać
               results.byLevel[level].created++
               results.totalCreated++
+              addedInThisBatch++
+              stillNeeded-- // Zmniejsz liczbę potrzebnych
             } catch {
               results.byLevel[level].skipped++
               results.totalSkipped++
             }
           }
 
+          console.log(`Level ${level} attempt ${batchAttempts}: added ${addedInThisBatch} words, still need ${stillNeeded}`)
+
           // Delay między requestami (rate limiting)
           await new Promise(resolve => setTimeout(resolve, 1500))
 
         } catch (error) {
-          console.error(`Error generating batch ${batch} for level ${level}:`, error)
+          console.error(`Error generating attempt ${batchAttempts} for level ${level}:`, error)
         }
       }
     }
