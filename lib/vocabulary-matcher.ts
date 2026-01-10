@@ -124,12 +124,16 @@ export async function findVocabularyMatch(
   language: string
 ): Promise<MatchResult | null> {
   const normalized = normalizeWord(word)
+  const originalLower = word.toLowerCase().trim()
 
-  // 1. Szukaj dokładnego dopasowania
+  // 1. Szukaj dokładnego dopasowania - najpierw z oryginalnymi znakami, potem bez
   const exactMatch = await prisma.vocabularyBase.findFirst({
     where: {
       language,
-      word: normalized,
+      OR: [
+        { word: originalLower },      // niño = niño
+        { word: normalized },          // nino = nino (gdyby baza miała bez akcentów)
+      ],
     },
   })
 
