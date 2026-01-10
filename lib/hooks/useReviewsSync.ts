@@ -1,14 +1,15 @@
 /**
- * Hook do synchronizacji stanu powtórek między komponentami.
+ * System synchronizacji powtórek między komponentami.
  *
- * Problem: ReviewScheduleManager (w zestawie) i ReviewCalendar (na dashboard)
- * to osobne komponenty bez wspólnego stanu. Gdy użytkownik oznaczy powtórkę
- * jako completed w zestawie i wróci na dashboard - kalendarz nie wie o zmianie.
- *
- * Rozwiązanie: Custom event bus przez window events.
+ * Używa:
+ * - Custom events dla komunikacji w tej samej karcie
+ * - sessionStorage dla synchronizacji po nawigacji
  */
 
+import { useEffect, useCallback } from 'react'
+
 const REVIEWS_UPDATED_EVENT = 'reviews-updated'
+const STORAGE_KEY = 'reviews-last-updated'
 
 export interface ReviewsUpdatedDetail {
   type: 'completed' | 'created' | 'deleted' | 'updated'
@@ -19,48 +20,94 @@ export interface ReviewsUpdatedDetail {
 
 /**
  * Emituje event że powtórki zostały zmienione.
- * Wywołuj po każdej akcji w ReviewScheduleManager.
+ * Wywołuj po KAŻDEJ udanej operacji na powtórkach.
  */
 export function emitReviewsUpdated(detail: Omit<ReviewsUpdatedDetail, 'timestamp'>) {
+  if (typeof window === 'undefined') return
+
+  const timestamp = Date.now()
+
+  // Custom event dla tej samej karty
   const event = new CustomEvent<ReviewsUpdatedDetail>(REVIEWS_UPDATED_EVENT, {
-    detail: {
-      ...detail,
-      timestamp: Date.now(),
-    },
+    detail: { ...detail, timestamp },
   })
   window.dispatchEvent(event)
 
-  // Zapisz timestamp w sessionStorage żeby komponenty mogły sprawdzić po mount
-  sessionStorage.setItem('reviews-last-updated', Date.now().toString())
+  // sessionStorage dla nawigacji
+  try {
+    sessionStorage.setItem(STORAGE_KEY, timestamp.toString())
+  } catch {
+    // Ignoruj błędy sessionStorage
+  }
 }
 
 /**
- * Hook do nasłuchiwania na zmiany w powtórkach.
- * Wywołaj callback gdy dane się zmienią.
+ * Hook do nasłuchiwania zmian w powtórkach.
+ * Wywołuje callback gdy inne komponenty zmienią powtórki.
  */
 export function useReviewsListener(callback: () => void) {
-  if (typeof window === 'undefined') return
+  useEffect(() => {
+    if (typeof window === 'undefined') return
 
-  const handler = () => {
-    callback()
-  }
+    const handler = () => {
+      callback()
+    }
 
-  window.addEventListener(REVIEWS_UPDATED_EVENT, handler)
-
-  return () => {
-    window.removeEventListener(REVIEWS_UPDATED_EVENT, handler)
-  }
+    window.addEventListener(REVIEWS_UPDATED_EVENT, handler)
+    return () => window.removeEventListener(REVIEWS_UPDATED_EVENT, handler)
+  }, [callback])
 }
 
 /**
  * Sprawdza czy dane mogły się zmienić od ostatniego fetch.
- * Użyj na mount komponentu.
  */
 export function shouldRefetchReviews(lastFetchTime: number): boolean {
   if (typeof window === 'undefined') return false
 
-  const lastUpdated = sessionStorage.getItem('reviews-last-updated')
-  if (!lastUpdated) return false
+  try {
+    const lastUpdated = sessionStorage.getItem(STORAGE_KEY)
+    if (!lastUpdated) return false
+    return parseInt(lastUpdated, 10) > lastFetchTime
+  } catch {
+    return false
+  }
+}
 
-  return parseInt(lastUpdated, 10) > lastFetchTime
+/**
+ * Hook który automatycznie odświeża dane po zmianach.
+ * Łączy event listener + sprawdzanie sessionStorage.
+ */
+export function useReviewsAutoRefresh(
+  fetchFn: () => Promise<void>,
+  lastFetchTimeRef: React.MutableRefObject<number>
+) {
+  // Nasłuchuj na eventy z innych komponentów
+  const handleUpdate = useCallback(() => {
+    fetchFn()
+  }, [fetchFn])
+
+  useReviewsListener(handleUpdate)
+
+  // Sprawdź przy focus/visibility czy coś się zmieniło
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const checkAndRefetch = () => {
+      if (shouldRefetchReviews(lastFetchTimeRef.current)) {
+        fetchFn()
+      }
+    }
+
+    // Focus i visibility dla nawigacji
+    window.addEventListener('focus', checkAndRefetch)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        checkAndRefetch()
+      }
+    })
+
+    return () => {
+      window.removeEventListener('focus', checkAndRefetch)
+    }
+  }, [fetchFn, lastFetchTimeRef])
 }

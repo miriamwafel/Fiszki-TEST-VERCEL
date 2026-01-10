@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/Button'
 import { emitReviewsUpdated } from '@/lib/hooks/useReviewsSync'
+import { toast } from 'sonner'
 
 interface Review {
   id: string
@@ -25,12 +26,9 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDate, setEditDate] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    fetchReviews()
-  }, [moduleId])
-
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     setError(null)
     try {
       const response = await fetch(`/api/grammar/${moduleId}/reviews`)
@@ -38,20 +36,25 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
         const data = await response.json()
         setReviews(data)
       } else {
-        console.error('Failed to fetch reviews:', response.status)
         setError('Nie udało się załadować harmonogramu')
       }
-    } catch (error) {
-      console.error('Failed to fetch reviews:', error)
+    } catch {
       setError('Błąd połączenia z serwerem')
     } finally {
       setLoading(false)
     }
-  }
+  }, [moduleId])
+
+  useEffect(() => {
+    fetchReviews()
+  }, [fetchReviews])
 
   const createSchedule = async () => {
     setCreating(true)
     setError(null)
+
+    const toastId = toast.loading('Tworzenie harmonogramu...')
+
     try {
       const response = await fetch(`/api/grammar/${moduleId}/reviews`, {
         method: 'POST',
@@ -64,23 +67,23 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
         setReviews(data)
         setExpanded(true)
         emitReviewsUpdated({ type: 'created' })
+        toast.success('Harmonogram utworzony!', { id: toastId })
       } else {
-        console.error('Failed to create schedule:', response.status)
-        alert('Nie udało się utworzyć harmonogramu. Spróbuj ponownie.')
+        toast.error('Nie udało się utworzyć harmonogramu', { id: toastId })
       }
-    } catch (error) {
-      console.error('Failed to create schedule:', error)
-      alert('Nie udało się utworzyć harmonogramu. Sprawdź połączenie.')
+    } catch {
+      toast.error('Błąd połączenia', { id: toastId })
     } finally {
       setCreating(false)
     }
   }
 
   const markCompleted = async (reviewId: string) => {
-    // Optimistic update
-    setReviews(prev => prev.map(r =>
-      r.id === reviewId ? { ...r, completed: true, completedAt: new Date().toISOString() } : r
-    ))
+    // Blokuj wielokrotne kliknięcia
+    if (savingIds.has(reviewId)) return
+
+    setSavingIds(prev => new Set(prev).add(reviewId))
+    const toastId = toast.loading('Zapisywanie...')
 
     try {
       const response = await fetch(`/api/grammar/${moduleId}/reviews`, {
@@ -90,23 +93,32 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
       })
 
       if (response.ok) {
-        // Pobierz świeże dane z serwera
-        await fetchReviews()
+        // Aktualizuj lokalny stan
+        setReviews(prev => prev.map(r =>
+          r.id === reviewId ? { ...r, completed: true, completedAt: new Date().toISOString() } : r
+        ))
         emitReviewsUpdated({ type: 'completed', reviewId })
+        toast.success('Powtórka ukończona!', { id: toastId })
       } else {
-        // Revert - pobierz dane z serwera
-        await fetchReviews()
-        alert('Nie udało się oznaczyć jako ukończone. Spróbuj ponownie.')
+        toast.error('Nie udało się zapisać', { id: toastId })
       }
     } catch {
-      // Revert - pobierz dane z serwera
-      await fetchReviews()
-      alert('Błąd połączenia. Spróbuj ponownie.')
+      toast.error('Błąd połączenia', { id: toastId })
+    } finally {
+      setSavingIds(prev => {
+        const next = new Set(prev)
+        next.delete(reviewId)
+        return next
+      })
     }
   }
 
   const updateReviewDate = async (reviewId: string) => {
     if (!editDate) return
+    if (savingIds.has(reviewId)) return
+
+    setSavingIds(prev => new Set(prev).add(reviewId))
+    const toastId = toast.loading('Zmieniam datę...')
 
     try {
       const response = await fetch(`/api/grammar/${moduleId}/reviews`, {
@@ -117,27 +129,37 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
 
       if (response.ok) {
         const updated = await response.json()
-        setReviews(reviews.map(r =>
+        setReviews(prev => prev.map(r =>
           r.id === reviewId ? { ...r, scheduledDate: updated.scheduledDate } : r
         ))
         setEditingId(null)
         setEditDate('')
+        emitReviewsUpdated({ type: 'updated', reviewId })
+        toast.success('Data zmieniona!', { id: toastId })
       } else {
-        console.error('Failed to update review date:', response.status)
-        alert('Nie udało się zmienić daty. Spróbuj ponownie.')
+        toast.error('Nie udało się zmienić daty', { id: toastId })
       }
-    } catch (error) {
-      console.error('Failed to update review date:', error)
-      alert('Błąd połączenia. Spróbuj ponownie.')
+    } catch {
+      toast.error('Błąd połączenia', { id: toastId })
+    } finally {
+      setSavingIds(prev => {
+        const next = new Set(prev)
+        next.delete(reviewId)
+        return next
+      })
     }
   }
 
   const deleteReview = async (reviewId: string) => {
     if (!confirm('Czy na pewno chcesz usunąć tę powtórkę?')) return
+    if (savingIds.has(reviewId)) return
+
+    setSavingIds(prev => new Set(prev).add(reviewId))
+    const toastId = toast.loading('Usuwanie...')
 
     // Optimistic update
     const previousReviews = [...reviews]
-    setReviews(reviews.filter(r => r.id !== reviewId))
+    setReviews(prev => prev.filter(r => r.id !== reviewId))
 
     try {
       const response = await fetch(`/api/grammar/${moduleId}/reviews?reviewId=${reviewId}`, {
@@ -146,17 +168,20 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
 
       if (response.ok) {
         emitReviewsUpdated({ type: 'deleted', reviewId })
+        toast.success('Powtórka usunięta', { id: toastId })
       } else {
-        // Revert on failure
         setReviews(previousReviews)
-        console.error('Failed to delete review:', response.status)
-        alert('Nie udało się usunąć powtórki. Spróbuj ponownie.')
+        toast.error('Nie udało się usunąć', { id: toastId })
       }
-    } catch (error) {
-      // Revert on error
+    } catch {
       setReviews(previousReviews)
-      console.error('Failed to delete review:', error)
-      alert('Błąd połączenia. Spróbuj ponownie.')
+      toast.error('Błąd połączenia', { id: toastId })
+    } finally {
+      setSavingIds(prev => {
+        const next = new Set(prev)
+        next.delete(reviewId)
+        return next
+      })
     }
   }
 
@@ -216,7 +241,6 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
     )
   }
 
-  // Błąd ładowania
   if (error) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -241,7 +265,6 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
     )
   }
 
-  // Brak harmonogramu
   if (reviews.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-4">
@@ -377,7 +400,8 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
                         e.stopPropagation()
                         updateReviewDate(review.id)
                       }}
-                      className="text-green-600 hover:text-green-700 p-1"
+                      disabled={savingIds.has(review.id)}
+                      className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -435,7 +459,8 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
                       e.stopPropagation()
                       deleteReview(review.id)
                     }}
-                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors"
+                    disabled={savingIds.has(review.id)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
                     title="Usuń"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -447,9 +472,10 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
                       e.stopPropagation()
                       markCompleted(review.id)
                     }}
-                    className="ml-1 px-2 py-1 text-xs font-medium bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+                    disabled={savingIds.has(review.id)}
+                    className="ml-1 px-2 py-1 text-xs font-medium bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
-                    Gotowe
+                    {savingIds.has(review.id) ? '...' : 'Gotowe'}
                   </button>
                 </div>
               )}
@@ -460,7 +486,8 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
                     e.stopPropagation()
                     deleteReview(review.id)
                   }}
-                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+                  disabled={savingIds.has(review.id)}
+                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0 disabled:opacity-50"
                   title="Usuń"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

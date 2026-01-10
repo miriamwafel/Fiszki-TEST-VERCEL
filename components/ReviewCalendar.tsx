@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
-import { shouldRefetchReviews } from '@/lib/hooks/useReviewsSync'
+import { useReviewsListener, shouldRefetchReviews } from '@/lib/hooks/useReviewsSync'
 
 interface SetReviewItem {
   id: string
@@ -114,15 +114,9 @@ export function ReviewCalendar() {
     fetchReviews()
   }, [fetchReviews])
 
-  // Nasłuchuj na zmiany z innych komponentów (np. ReviewScheduleManager)
-  useEffect(() => {
-    const handleReviewsUpdated = () => {
-      fetchReviews()
-    }
-
-    window.addEventListener('reviews-updated', handleReviewsUpdated)
-    return () => window.removeEventListener('reviews-updated', handleReviewsUpdated)
-  }, [fetchReviews])
+  // Nasłuchuj na zmiany z innych komponentów (ReviewScheduleManager, GrammarReviewScheduleManager)
+  // Używamy hooka z systemu synchronizacji
+  useReviewsListener(fetchReviews)
 
   // Sprawdź przy mount czy dane mogły się zmienić (np. po powrocie z innej strony)
   useEffect(() => {
@@ -131,29 +125,27 @@ export function ReviewCalendar() {
     }
   }, [fetchReviews])
 
-  // Refetch when window gains focus (user returns to tab)
+  // Refetch when window gains focus or visibility changes (user returns to tab/page)
   useEffect(() => {
-    const handleFocus = () => {
-      // Sprawdź czy warto refetchować (czy coś się zmieniło)
+    const checkAndRefetch = () => {
       if (shouldRefetchReviews(lastFetchTimeRef.current)) {
         fetchReviews()
       }
     }
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [fetchReviews])
 
-  // Refetch przy nawigacji (visibilitychange)
-  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        if (shouldRefetchReviews(lastFetchTimeRef.current)) {
-          fetchReviews()
-        }
+        checkAndRefetch()
       }
     }
+
+    window.addEventListener('focus', checkAndRefetch)
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('focus', checkAndRefetch)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [fetchReviews])
 
   // Generuj 14 dni od dziś
