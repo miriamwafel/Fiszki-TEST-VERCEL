@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     const languageName = languageNames[language] || language
 
     // Pobierz nieznane słowa z bazy słownictwa dla tego poziomu
-    let targetWords: string[] = []
+    let targetWordsData: Array<{ word: string; translation: string }> = []
     try {
       const unknownWords = await getUnknownWords(
         session.user.id,
@@ -78,15 +78,16 @@ export async function POST(request: Request) {
         10, // Max 10 słów do włączenia w historię
         difficulty // Filtruj po poziomie trudności
       )
-      targetWords = unknownWords.map(w => `${w.word} (${w.translation})`)
+      targetWordsData = unknownWords.map(w => ({ word: w.word, translation: w.translation }))
     } catch (err) {
       console.error('Failed to get unknown words:', err)
       // Kontynuuj bez target words jeśli baza słownictwa jest pusta
     }
 
     // Rozszerz topic o słowa do nauczenia
-    const enrichedTopic = targetWords.length > 0
-      ? `${topic || 'dowolny temat'}. WAŻNE: Historia MUSI zawierać następujące słowa: ${targetWords.join(', ')}`
+    const targetWordsPrompt = targetWordsData.map(w => `${w.word} (${w.translation})`).join(', ')
+    const enrichedTopic = targetWordsData.length > 0
+      ? `${topic || 'dowolny temat'}. WAŻNE: Historia MUSI zawierać następujące słowa: ${targetWordsPrompt}`
       : topic
 
     // Generuj historię RAZEM ze słowniczkiem (lepsza jakość!)
@@ -100,6 +101,7 @@ export async function POST(request: Request) {
         difficulty,
         wordCount,
         vocabulary: JSON.parse(JSON.stringify(storyResult.vocabularyMap)),
+        targetWords: targetWordsData.length > 0 ? JSON.parse(JSON.stringify(targetWordsData)) : null,
         userId: session.user.id,
       },
     })
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ...story,
       vocabulary: storyResult.vocabulary, // Lista 10-15 najważniejszych słów
+      targetWords: targetWordsData, // Słowa z bazy do wyróżnienia
     })
   } catch (error) {
     console.error('Create story error:', error)

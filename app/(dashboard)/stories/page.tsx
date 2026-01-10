@@ -133,6 +133,7 @@ interface Story {
   wordCount: number
   createdAt: string
   vocabulary?: { word: string; translation: string }[]
+  targetWords?: { word: string; translation: string }[] // Słowa z bazy słownictwa
   sets?: LinkedSet[]
 }
 
@@ -598,11 +599,36 @@ export default function StoriesPage() {
     }
   }
 
+  // Funkcja normalizująca słowa (z akcentami i bez) do porównania
+  const normalizeForComparison = (word: string): string[] => {
+    const lower = word.toLowerCase().replace(/[.,!?;:"""'']/g, '').trim()
+    const withoutAccents = lower.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return lower !== withoutAccents ? [lower, withoutAccents] : [lower]
+  }
+
   const renderStoryContent = (content: string) => {
     const words = content.split(/(\s+)/)
 
-    // If no vocabulary, render normally
-    if (!selectedStory?.vocabulary || !Array.isArray(selectedStory.vocabulary) || selectedStory.vocabulary.length === 0) {
+    // Create targetWords lookup map (słowa z bazy słownictwa do nauki)
+    const targetWordsMap = new Map<string, { word: string; translation: string }>()
+    if (selectedStory?.targetWords && Array.isArray(selectedStory.targetWords)) {
+      selectedStory.targetWords.forEach((item) => {
+        const normalized = normalizeForComparison(item.word)
+        normalized.forEach(n => targetWordsMap.set(n, item))
+      })
+    }
+
+    // Create vocabulary lookup map (normalize for matching)
+    const vocabMap = new Map<string, { word: string; translation: string }>()
+    if (selectedStory?.vocabulary && Array.isArray(selectedStory.vocabulary)) {
+      selectedStory.vocabulary.forEach((item) => {
+        const normalized = normalizeForComparison(item.word)
+        normalized.forEach(n => vocabMap.set(n, item))
+      })
+    }
+
+    // If no vocabulary and no targetWords, render normally
+    if (vocabMap.size === 0 && targetWordsMap.size === 0) {
       return words.map((word, index) => {
         if (/^\s+$/.test(word)) {
           return word
@@ -618,14 +644,6 @@ export default function StoriesPage() {
         )
       })
     }
-
-    // Create vocabulary lookup map (normalize for matching)
-    const vocabMap = new Map<string, { word: string; translation: string }>()
-    selectedStory.vocabulary.forEach((item) => {
-      // Normalize: lowercase, remove punctuation
-      const normalized = item.word.toLowerCase().replace(/[.,!?;:"""'']/g, '').trim()
-      vocabMap.set(normalized, item)
-    })
 
     const result: React.ReactNode[] = []
     let i = 0
@@ -663,12 +681,31 @@ export default function StoriesPage() {
 
         // Normalize the phrase for lookup
         const phrase = phraseWords.join(' ')
-        const normalizedPhrase = phrase.toLowerCase().replace(/[.,!?;:"""'']/g, '').trim()
+        const normalizedPhrases = normalizeForComparison(phrase)
 
-        if (vocabMap.has(normalizedPhrase)) {
-          // Found a vocabulary match!
-          const vocabItem = vocabMap.get(normalizedPhrase)!
+        // Sprawdź najpierw targetWords (słowa z bazy do nauki) - zielone
+        let isTargetWord = false
+        let matchedItem: { word: string; translation: string } | null = null
 
+        for (const normalizedPhrase of normalizedPhrases) {
+          if (targetWordsMap.has(normalizedPhrase)) {
+            isTargetWord = true
+            matchedItem = targetWordsMap.get(normalizedPhrase)!
+            break
+          }
+        }
+
+        // Jeśli nie targetWord, sprawdź vocabulary - żółte
+        if (!matchedItem) {
+          for (const normalizedPhrase of normalizedPhrases) {
+            if (vocabMap.has(normalizedPhrase)) {
+              matchedItem = vocabMap.get(normalizedPhrase)!
+              break
+            }
+          }
+        }
+
+        if (matchedItem) {
           // Collect all elements that make up this phrase (words + whitespace)
           const phraseElements: React.ReactNode[] = []
           for (let j = 0; j < phraseLen; j++) {
@@ -682,12 +719,17 @@ export default function StoriesPage() {
             phraseElements.push(words[i + j * 2])
           }
 
+          // Różne kolory: zielony dla targetWords (słowa do nauki), żółty dla zwykłego vocabulary
+          const colorClass = isTargetWord
+            ? 'bg-emerald-100 hover:bg-emerald-200 border-b-2 border-emerald-400'
+            : 'bg-amber-100 hover:bg-amber-200'
+
           result.push(
             <span
               key={`vocab-${i}`}
-              className="story-word bg-amber-100 hover:bg-amber-200 cursor-pointer px-0.5 rounded transition-colors"
-              onClick={() => setWordModal(vocabItem)}
-              title={`${vocabItem.word} - ${vocabItem.translation}`}
+              className={`story-word ${colorClass} cursor-pointer px-0.5 rounded transition-colors`}
+              onClick={() => setWordModal(matchedItem)}
+              title={`${matchedItem.word} - ${matchedItem.translation}${isTargetWord ? ' (słowo do nauki)' : ''}`}
             >
               {phraseElements}
             </span>
@@ -860,6 +902,25 @@ export default function StoriesPage() {
                   <li>Kliknij na dowolne słowo w tekście, aby sprawdzić jego znaczenie i dodać do zestawu fiszek</li>
                   <li>Na dole znajdziesz słownik wyrazów i fraz z tej historii - klikając w nie też możesz dodać je do zestawu</li>
                 </ul>
+                {(selectedStory.targetWords?.length || selectedStory.vocabulary?.length) && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <p className="text-sm text-blue-800 font-medium mb-2">Legenda kolorów:</p>
+                    <div className="flex flex-wrap gap-3 text-sm">
+                      {selectedStory.targetWords && selectedStory.targetWords.length > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="bg-emerald-100 border-b-2 border-emerald-400 px-2 py-0.5 rounded">przykład</span>
+                          <span className="text-blue-700">= słowa do nauki z bazy</span>
+                        </span>
+                      )}
+                      {selectedStory.vocabulary && selectedStory.vocabulary.length > 0 && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="bg-amber-100 px-2 py-0.5 rounded">przykład</span>
+                          <span className="text-blue-700">= słownictwo z historii</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="prose max-w-none mb-6">
@@ -923,9 +984,36 @@ export default function StoriesPage() {
                 )}
               </div>
 
+              {selectedStory.targetWords && selectedStory.targetWords.length > 0 && (
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <span className="w-3 h-3 bg-emerald-400 rounded-full"></span>
+                    Słowa do nauki z bazy słownictwa
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Te słowa zostały wybrane specjalnie dla Ciebie z bazy słownictwa - to słowa, których jeszcze nie znasz!
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {selectedStory.targetWords.map((item, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setWordModal(item)}
+                        className="text-left p-2 bg-emerald-50 rounded hover:bg-emerald-100 transition-colors border border-emerald-200"
+                      >
+                        <p className="font-medium text-gray-900 text-sm">
+                          {item.word}
+                        </p>
+                        <p className="text-emerald-600 text-xs">{item.translation}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedStory.vocabulary && selectedStory.vocabulary.length > 0 && (
                 <div className="mt-6 pt-6 border-t">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <span className="w-3 h-3 bg-amber-400 rounded-full"></span>
                     Słownictwo z historii
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
@@ -933,12 +1021,12 @@ export default function StoriesPage() {
                       <button
                         key={index}
                         onClick={() => setWordModal(item)}
-                        className="text-left p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
+                        className="text-left p-2 bg-amber-50 rounded hover:bg-amber-100 transition-colors border border-amber-200"
                       >
                         <p className="font-medium text-gray-900 text-sm">
                           {item.word}
                         </p>
-                        <p className="text-gray-500 text-xs">{item.translation}</p>
+                        <p className="text-amber-600 text-xs">{item.translation}</p>
                       </button>
                     ))}
                   </div>
