@@ -322,8 +322,8 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
         {/* Harmonogram powtórek */}
         <div className="mb-4">
           <ReviewScheduleManager
-            setId={set.id}
-            setCreatedAt={typeof set.createdAt === 'string' ? set.createdAt : set.createdAt.toISOString()}
+            type="set"
+            resourceId={set.id}
           />
         </div>
 

@@ -14,12 +14,29 @@ interface Review {
   completedAt: string | null
 }
 
+type ReviewType = 'set' | 'grammar'
+
 interface ReviewScheduleManagerProps {
-  setId: string
-  setCreatedAt: string
+  /** Typ powtórki - 'set' dla fiszek, 'grammar' dla gramatyki */
+  type: ReviewType
+  /** ID zasobu (setId lub moduleId) */
+  resourceId: string
+  /** Kolor akcentu - domyślnie blue dla fiszek, purple dla gramatyki */
+  accentColor?: 'blue' | 'purple'
+  /** Wariant stylowania */
+  variant?: 'card' | 'bordered'
 }
 
-export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleManagerProps) {
+/**
+ * Uniwersalny komponent do zarządzania harmonogramem powtórek.
+ * Działa zarówno dla zestawów fiszek jak i modułów gramatycznych.
+ */
+export function ReviewScheduleManager({
+  type,
+  resourceId,
+  accentColor = type === 'grammar' ? 'purple' : 'blue',
+  variant = type === 'grammar' ? 'bordered' : 'card',
+}: ReviewScheduleManagerProps) {
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -29,11 +46,16 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   const [error, setError] = useState<string | null>(null)
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
 
+  // Buduj URL API na podstawie typu
+  const apiUrl = type === 'grammar'
+    ? `/api/grammar/${resourceId}/reviews`
+    : `/api/sets/${resourceId}/reviews`
+
   const fetchReviews = useCallback(async () => {
     setError(null)
     try {
       // cache: 'no-store' + timestamp wymusza świeże dane
-      const response = await fetch(`/api/sets/${setId}/reviews?_t=${Date.now()}`, { cache: 'no-store' })
+      const response = await fetch(`${apiUrl}?_t=${Date.now()}`, { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setReviews(data)
@@ -45,7 +67,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     } finally {
       setLoading(false)
     }
-  }, [setId])
+  }, [apiUrl])
 
   useEffect(() => {
     fetchReviews()
@@ -58,7 +80,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     const toastId = toast.loading('Tworzenie harmonogramu...')
 
     try {
-      const response = await fetch(`/api/sets/${setId}/reviews`, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -68,7 +90,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
         const data = await response.json()
         setReviews(data)
         setExpanded(true)
-        emitReviewsUpdated({ type: 'created', setId })
+        emitReviewsUpdated({ type: 'created', setId: type === 'set' ? resourceId : undefined })
         toast.success('Harmonogram utworzony!', { id: toastId })
       } else {
         toast.error('Nie udało się utworzyć harmonogramu', { id: toastId })
@@ -88,7 +110,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     const toastId = toast.loading('Zapisywanie...')
 
     try {
-      const response = await fetch(`/api/sets/${setId}/reviews`, {
+      const response = await fetch(apiUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewId, completed: true }),
@@ -99,7 +121,11 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
         setReviews(prev => prev.map(r =>
           r.id === reviewId ? { ...r, completed: true, completedAt: new Date().toISOString() } : r
         ))
-        emitReviewsUpdated({ type: 'completed', reviewId, setId })
+        emitReviewsUpdated({
+          type: 'completed',
+          reviewId,
+          setId: type === 'set' ? resourceId : undefined
+        })
         toast.success('Powtórka ukończona!', { id: toastId })
       } else {
         toast.error('Nie udało się zapisać', { id: toastId })
@@ -123,7 +149,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     const toastId = toast.loading('Zmieniam datę...')
 
     try {
-      const response = await fetch(`/api/sets/${setId}/reviews`, {
+      const response = await fetch(apiUrl, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewId, scheduledDate: editDate }),
@@ -136,7 +162,11 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
         ))
         setEditingId(null)
         setEditDate('')
-        emitReviewsUpdated({ type: 'updated', reviewId, setId })
+        emitReviewsUpdated({
+          type: 'updated',
+          reviewId,
+          setId: type === 'set' ? resourceId : undefined
+        })
         toast.success('Data zmieniona!', { id: toastId })
       } else {
         toast.error('Nie udało się zmienić daty', { id: toastId })
@@ -164,12 +194,16 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     setReviews(prev => prev.filter(r => r.id !== reviewId))
 
     try {
-      const response = await fetch(`/api/sets/${setId}/reviews?reviewId=${reviewId}`, {
+      const response = await fetch(`${apiUrl}?reviewId=${reviewId}`, {
         method: 'DELETE',
       })
 
       if (response.ok) {
-        emitReviewsUpdated({ type: 'deleted', reviewId, setId })
+        emitReviewsUpdated({
+          type: 'deleted',
+          reviewId,
+          setId: type === 'set' ? resourceId : undefined
+        })
         toast.success('Powtórka usunięta', { id: toastId })
       } else {
         setReviews(previousReviews)
@@ -232,20 +266,41 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     return date.getTime() === today.getTime()
   }
 
+  // Klasy kolorów na podstawie accentColor
+  const colors = {
+    accent: accentColor === 'purple' ? 'purple' : 'blue',
+    bg: accentColor === 'purple' ? 'bg-purple-100' : 'bg-blue-100',
+    text: accentColor === 'purple' ? 'text-purple-600' : 'text-blue-600',
+    bgLight: accentColor === 'purple' ? 'bg-purple-50' : 'bg-blue-50',
+    textDark: accentColor === 'purple' ? 'text-purple-700' : 'text-blue-700',
+    border: accentColor === 'purple' ? 'border-purple-200' : 'border-blue-200',
+    borderCircle: accentColor === 'purple' ? 'border-purple-400' : 'border-blue-400',
+    hoverText: accentColor === 'purple' ? 'hover:text-purple-600' : 'hover:text-blue-600',
+  }
+
+  // Wrapper na podstawie wariantu
+  const Wrapper = variant === 'card'
+    ? ({ children, className }: { children: React.ReactNode; className?: string }) => (
+        <Card className={className}>{children}</Card>
+      )
+    : ({ children, className }: { children: React.ReactNode; className?: string }) => (
+        <div className={`bg-white rounded-xl border border-gray-200 ${className || ''}`}>{children}</div>
+      )
+
   if (loading) {
     return (
-      <Card className="p-4">
+      <Wrapper className="p-4">
         <div className="flex items-center gap-2 text-gray-500">
           <div className="w-4 h-4 border-2 border-gray-200 rounded-full animate-spin border-t-gray-500" />
-          Ładowanie harmonogramu...
+          <span className="text-sm">Ładowanie harmonogramu...</span>
         </div>
-      </Card>
+      </Wrapper>
     )
   }
 
   if (error) {
     return (
-      <Card className="p-4">
+      <Wrapper className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 text-red-600">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -258,30 +313,35 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
               setLoading(true)
               fetchReviews()
             }}
-            className="text-sm text-primary-600 hover:underline"
+            className={`text-sm ${colors.text} hover:underline`}
           >
             Spróbuj ponownie
           </button>
         </div>
-      </Card>
+      </Wrapper>
     )
   }
 
   if (reviews.length === 0) {
     return (
-      <Card className="p-4">
-        <div className="flex items-center justify-between">
+      <Wrapper className="p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h3 className="font-medium text-gray-900">Harmonogram powtórek</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="font-medium text-gray-900 flex items-center gap-2">
+              <svg className={`w-5 h-5 ${colors.text}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Harmonogram powtórek
+            </h3>
+            <p className="text-sm text-gray-500 mt-1">
               Włącz powtórki, aby system przypominał o nauce
             </p>
           </div>
-          <Button onClick={createSchedule} loading={creating}>
+          <Button onClick={createSchedule} loading={creating} className="w-full sm:w-auto">
             Włącz powtórki
           </Button>
         </div>
-      </Card>
+      </Wrapper>
     )
   }
 
@@ -290,9 +350,11 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   const nextReview = pendingReviews[0]
 
   return (
-    <Card className="p-4">
+    <Wrapper className={variant === 'bordered' ? 'overflow-hidden' : 'p-4'}>
       <div
-        className="flex items-center justify-between cursor-pointer"
+        className={`flex items-center justify-between cursor-pointer ${
+          variant === 'bordered' ? 'p-4 hover:bg-gray-50 transition-colors' : ''
+        }`}
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-3">
@@ -301,14 +363,18 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
               ? 'bg-red-100'
               : nextReview && isToday(nextReview.scheduledDate)
               ? 'bg-green-100'
-              : 'bg-blue-100'
+              : pendingReviews.length === 0
+              ? 'bg-gray-100'
+              : colors.bg
           }`}>
             <svg className={`w-5 h-5 ${
               nextReview && isOverdue(nextReview.scheduledDate) && !nextReview.completed
                 ? 'text-red-600'
                 : nextReview && isToday(nextReview.scheduledDate)
                 ? 'text-green-600'
-                : 'text-blue-600'
+                : pendingReviews.length === 0
+                ? 'text-gray-400'
+                : colors.text
             }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
@@ -324,7 +390,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                   : 'text-gray-500'
               }`}>
                 {isOverdue(nextReview.scheduledDate)
-                  ? `Zaległa powtórka!`
+                  ? 'Zaległa powtórka!'
                   : isToday(nextReview.scheduledDate)
                   ? 'Powtórka na dziś!'
                   : `Następna: ${formatDate(nextReview.scheduledDate)}`}
@@ -335,7 +401,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
             {completedReviews.length}/{reviews.length}
           </span>
           <svg
@@ -350,21 +416,27 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
       </div>
 
       {expanded && (
-        <div className="mt-4 pt-4 border-t space-y-2">
+        <div className={`space-y-2 ${
+          variant === 'bordered'
+            ? 'border-t border-gray-100 p-4 bg-gray-50'
+            : 'mt-4 pt-4 border-t'
+        }`}>
           {reviews.map((review) => (
             <div
               key={review.id}
               className={`flex items-center justify-between p-3 rounded-lg ${
+                variant === 'bordered' ? 'bg-white border' : ''
+              } ${
                 review.completed
-                  ? 'bg-gray-50 text-gray-500'
+                  ? variant === 'bordered' ? 'border-gray-200 text-gray-500' : 'bg-gray-50 text-gray-500'
                   : isOverdue(review.scheduledDate)
-                  ? 'bg-red-50'
+                  ? variant === 'bordered' ? 'border-red-200 bg-red-50' : 'bg-red-50'
                   : isToday(review.scheduledDate)
-                  ? 'bg-green-50'
-                  : 'bg-blue-50'
+                  ? variant === 'bordered' ? 'border-green-200 bg-green-50' : 'bg-green-50'
+                  : variant === 'bordered' ? `${colors.border} ${colors.bgLight}` : colors.bgLight
               }`}
             >
-              <div className="flex items-center gap-3 flex-1">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
                 {review.completed ? (
                   <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -375,7 +447,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                       ? 'border-red-400'
                       : isToday(review.scheduledDate)
                       ? 'border-green-400'
-                      : 'border-blue-400'
+                      : colors.borderCircle
                   }`} />
                 )}
 
@@ -385,7 +457,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                       type="date"
                       value={editDate}
                       onChange={(e) => setEditDate(e.target.value)}
-                      className="text-sm border rounded px-2 py-1"
+                      className="text-sm border rounded px-2 py-1 flex-1 min-w-0"
                       onClick={(e) => e.stopPropagation()}
                     />
                     <button
@@ -394,7 +466,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                         updateReviewDate(review.id)
                       }}
                       disabled={savingIds.has(review.id)}
-                      className="text-green-600 hover:text-green-700 disabled:opacity-50"
+                      className="text-green-600 hover:text-green-700 p-1 disabled:opacity-50"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -406,7 +478,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                         setEditingId(null)
                         setEditDate('')
                       }}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-gray-400 hover:text-gray-600 p-1"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -414,7 +486,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                     </button>
                   </div>
                 ) : (
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <span className={`text-sm font-medium ${
                       review.completed
                         ? 'line-through text-gray-400'
@@ -422,25 +494,25 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                         ? 'text-red-700'
                         : isToday(review.scheduledDate)
                         ? 'text-green-700'
-                        : 'text-blue-700'
+                        : colors.textDark
                     }`}>
                       {formatDate(review.scheduledDate)}
                     </span>
                     <span className="text-xs text-gray-500 ml-2">
-                      (+{review.dayOffset} {review.dayOffset === 1 ? 'dzień' : 'dni'})
+                      +{review.dayOffset}d
                     </span>
                   </div>
                 )}
               </div>
 
               {!review.completed && editingId !== review.id && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
                       startEditing(review)
                     }}
-                    className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                    className={`p-1.5 text-gray-400 ${colors.hoverText} transition-colors`}
                     title="Edytuj datę"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -453,24 +525,23 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                       deleteReview(review.id)
                     }}
                     disabled={savingIds.has(review.id)}
-                    className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                    title="Usuń powtórkę"
+                    className="p-1.5 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                    title="Usuń"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                   </button>
-                  <Button
-                    variant="secondary"
+                  <button
                     onClick={(e) => {
                       e.stopPropagation()
                       markCompleted(review.id)
                     }}
                     disabled={savingIds.has(review.id)}
-                    className="text-xs py-1 px-2 ml-1"
+                    className="ml-1 px-2 py-1 text-xs font-medium bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
                   >
                     {savingIds.has(review.id) ? '...' : 'Ukończ'}
-                  </Button>
+                  </button>
                 </div>
               )}
 
@@ -481,8 +552,8 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
                     deleteReview(review.id)
                   }}
                   disabled={savingIds.has(review.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                  title="Usuń powtórkę"
+                  className="p-1.5 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0 disabled:opacity-50"
+                  title="Usuń"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -493,17 +564,19 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
           ))}
 
           <div className="pt-2 flex justify-end">
-            <Button
-              variant="secondary"
+            <button
               onClick={createSchedule}
-              loading={creating}
-              className="text-sm"
+              disabled={creating}
+              className={`text-sm text-gray-500 ${colors.hoverText} transition-colors disabled:opacity-50`}
             >
-              Zresetuj harmonogram
-            </Button>
+              {creating ? 'Resetowanie...' : 'Zresetuj harmonogram'}
+            </button>
           </div>
         </div>
       )}
-    </Card>
+    </Wrapper>
   )
 }
+
+// Re-export dla kompatybilności wstecznej
+export { ReviewScheduleManager as GrammarReviewScheduleManager }

@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
-import { GrammarReviewScheduleManager } from '@/components/GrammarReviewScheduleManager'
+import { GrammarReviewScheduleManager } from '@/components/ReviewScheduleManager'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -980,8 +980,8 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
           {/* Reviews schedule */}
           <div className="mt-6">
             <GrammarReviewScheduleManager
-              moduleId={moduleId}
-              moduleName={module.titlePl}
+              type="grammar"
+              resourceId={moduleId}
             />
           </div>
         </>
