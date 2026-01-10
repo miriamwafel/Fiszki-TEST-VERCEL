@@ -70,6 +70,7 @@ export default function VocabularyPage({ params }: { params: Promise<{ language:
   const [filter, setFilter] = useState<'all' | 'unknown' | 'learning' | 'known'>('all')
   const [levelFilter, setLevelFilter] = useState<string>('all')
   const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  const [syncing, setSyncing] = useState(false)
   const lastFetchTimeRef = useRef<number>(0)
 
   const fetchVocabulary = useCallback(async () => {
@@ -164,6 +165,33 @@ export default function VocabularyPage({ params }: { params: Promise<{ language:
     }
   }
 
+  const syncFlashcards = async () => {
+    if (syncing) return
+
+    setSyncing(true)
+    toast.info('Synchronizuję fiszki z bazą słownictwa...')
+
+    try {
+      const response = await fetch(`/api/vocabulary/${language}/sync-flashcards`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`Zsynchronizowano ${data.synced} słów!`)
+        // Odśwież dane
+        await fetchVocabulary()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Błąd synchronizacji')
+      }
+    } catch {
+      toast.error('Błąd połączenia')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -194,6 +222,25 @@ export default function VocabularyPage({ params }: { params: Promise<{ language:
         <p className="text-gray-600 mt-2">
           Przeglądaj najważniejsze słowa i śledź swój postęp
         </p>
+        <button
+          onClick={syncFlashcards}
+          disabled={syncing}
+          className="mt-3 px-4 py-2 bg-primary-100 text-primary-700 rounded-lg text-sm font-medium hover:bg-primary-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+          {syncing ? (
+            <>
+              <div className="w-4 h-4 border-2 border-primary-300 rounded-full animate-spin border-t-primary-600" />
+              Synchronizuję...
+            </>
+          ) : (
+            <>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Synchronizuj z fiszkami
+            </>
+          )}
+        </button>
       </div>
 
       {/* Stats */}
