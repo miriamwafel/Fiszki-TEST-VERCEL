@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
+import { Button } from '@/components/Button'
+import { toast } from 'sonner'
 
 interface LanguageStats {
   language: string
@@ -28,43 +30,86 @@ const languageFlags: Record<string, string> = {
   it: '🇮🇹',
 }
 
+const supportedLanguages = ['en', 'de', 'es', 'fr', 'it']
+
 export default function VocabularyIndexPage() {
   const [languages, setLanguages] = useState<LanguageStats[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [generating, setGenerating] = useState<string | null>(null)
+
+  const fetchLanguages = async () => {
+    try {
+      const stats: LanguageStats[] = []
+
+      for (const lang of supportedLanguages) {
+        const response = await fetch(`/api/vocabulary/${lang}?limit=1&_t=${Date.now()}`, {
+          cache: 'no-store',
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          stats.push({
+            language: lang,
+            total: data.stats?.total || 0,
+            unknown: data.stats?.unknown || 0,
+            learning: data.stats?.learning || 0,
+            known: data.stats?.known || 0,
+          })
+        }
+      }
+
+      setLanguages(stats)
+    } catch (error) {
+      console.error('Failed to fetch languages:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    const fetchLanguages = async () => {
+    fetchLanguages()
+
+    // Sprawdź czy admin
+    const checkAdmin = async () => {
       try {
-        // Pobierz statystyki dla każdego języka
-        const supportedLanguages = ['en', 'de', 'es', 'fr', 'it']
-        const stats: LanguageStats[] = []
-
-        for (const lang of supportedLanguages) {
-          const response = await fetch(`/api/vocabulary/${lang}?limit=1&_t=${Date.now()}`, {
-            cache: 'no-store',
-          })
-
-          if (response.ok) {
-            const data = await response.json()
-            if (data.stats && data.stats.total > 0) {
-              stats.push({
-                language: lang,
-                ...data.stats,
-              })
-            }
-          }
-        }
-
-        setLanguages(stats)
-      } catch (error) {
-        console.error('Failed to fetch languages:', error)
-      } finally {
-        setLoading(false)
+        const res = await fetch('/api/admin/users')
+        setIsAdmin(res.ok)
+      } catch {
+        setIsAdmin(false)
       }
     }
-
-    fetchLanguages()
+    checkAdmin()
   }, [])
+
+  const generateVocabulary = async (language: string, level: string) => {
+    if (generating) return
+
+    setGenerating(language)
+    toast.info(`Generuję bazę słów ${languageNames[language]} (${level})...`, { duration: 10000 })
+
+    try {
+      const response = await fetch(`/api/vocabulary/${language}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level, count: 200 }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`Wygenerowano ${data.count} słów dla ${languageNames[language]}!`)
+        // Odśwież listę
+        await fetchLanguages()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Błąd generowania')
+      }
+    } catch {
+      toast.error('Błąd połączenia')
+    } finally {
+      setGenerating(null)
+    }
+  }
 
   if (loading) {
     return (
@@ -76,6 +121,11 @@ export default function VocabularyIndexPage() {
     )
   }
 
+  const languagesWithData = languages.filter(l => l.total > 0)
+  const languagesEmpty = supportedLanguages.filter(
+    lang => !languagesWithData.find(l => l.language === lang)
+  )
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-8">
@@ -85,19 +135,63 @@ export default function VocabularyIndexPage() {
         </p>
       </div>
 
-      {languages.length === 0 ? (
+      {/* Panel admina - generowanie bazy */}
+      {isAdmin && languagesEmpty.length > 0 && (
+        <Card className="p-6 mb-8 border-purple-200 bg-purple-50">
+          <h2 className="text-lg font-bold text-purple-900 mb-4 flex items-center gap-2">
+            <span>⚙️</span> Panel admina - Wygeneruj bazę słownictwa
+          </h2>
+          <p className="text-sm text-purple-700 mb-4">
+            Kliknij przycisk aby wygenerować bazę najważniejszych słów dla wybranego języka.
+            Generowanie trwa ok. 30-60 sekund.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+            {languagesEmpty.map(lang => (
+              <div key={lang} className="flex items-center gap-2 bg-white rounded-lg p-3 border border-purple-200">
+                <span className="text-2xl">{languageFlags[lang]}</span>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{languageNames[lang]}</div>
+                  <div className="text-xs text-gray-500">Brak bazy</div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => generateVocabulary(lang, 'A1')}
+                  disabled={generating !== null}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {generating === lang ? (
+                    <span className="flex items-center gap-1">
+                      <div className="w-3 h-3 border-2 border-white/30 rounded-full animate-spin border-t-white" />
+                      Generuję...
+                    </span>
+                  ) : (
+                    'Generuj'
+                  )}
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-purple-600 mt-3">
+            Domyślnie generuje 200 słów poziomu A1-A2. Możesz wygenerować więcej uruchamiając ponownie dla B1, B2 itd.
+          </p>
+        </Card>
+      )}
+
+      {languagesWithData.length === 0 ? (
         <Card className="p-8 text-center">
           <div className="text-6xl mb-4">📚</div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
             Baza słownictwa jest pusta
           </h2>
           <p className="text-gray-600">
-            Administrator musi najpierw wygenerować bazę słów dla poszczególnych języków.
+            {isAdmin
+              ? 'Użyj panelu powyżej aby wygenerować bazę słów.'
+              : 'Administrator musi najpierw wygenerować bazę słów dla poszczególnych języków.'}
           </p>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {languages.map((lang) => {
+          {languagesWithData.map((lang) => {
             const progress = lang.total > 0
               ? Math.round(((lang.known + lang.learning) / lang.total) * 100)
               : 0

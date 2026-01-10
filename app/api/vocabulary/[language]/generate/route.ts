@@ -134,6 +134,7 @@ Zwróć TYLKO JSON array, bez żadnego dodatkowego tekstu.`
 
     return NextResponse.json({
       message: `Generated ${created.length} words, skipped ${skipped.length}`,
+      count: created.length,
       created: created.length,
       skipped: skipped.length,
     })
