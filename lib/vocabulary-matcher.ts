@@ -13,7 +13,7 @@ interface MatchResult {
   vocabularyId: string
   word: string
   translation: string
-  matchType: 'exact' | 'base_form' | 'partial'
+  matchType: 'exact' | 'base_form'
   confidence: number
 }
 
@@ -167,31 +167,7 @@ export async function findVocabularyMatch(
     }
   }
 
-  // 3. Szukaj częściowego dopasowania (słowo zawiera się w bazie lub odwrotnie)
-  const partialMatches = await prisma.vocabularyBase.findMany({
-    where: {
-      language,
-      OR: [
-        { word: { contains: normalized } },
-        { word: { startsWith: normalized.slice(0, Math.max(3, normalized.length - 2)) } },
-      ],
-    },
-    take: 5,
-    orderBy: { frequencyRank: 'asc' },
-  })
-
-  if (partialMatches.length > 0) {
-    // Wybierz najlepsze dopasowanie (najkrótsze słowo lub najwyższa częstotliwość)
-    const best = partialMatches[0]
-    return {
-      vocabularyId: best.id,
-      word: best.word,
-      translation: best.translation,
-      matchType: 'partial',
-      confidence: 0.5,
-    }
-  }
-
+  // Brak dopasowania - nie używamy partial matching bo prowadzi do błędów
   return null
 }
 
