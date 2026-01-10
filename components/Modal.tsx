@@ -37,6 +37,9 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
       onClick={(e) => {
         if (e.target === overlayRef.current) {
           onClose()
@@ -45,13 +48,14 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
     >
       <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-auto">
         <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <h2 id="modal-title" className="text-lg font-semibold text-gray-900">{title}</h2>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Zamknij modal">
             <svg
               className="w-5 h-5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path
                 strokeLinecap="round"

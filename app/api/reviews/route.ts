@@ -24,48 +24,48 @@ export async function GET(request: Request) {
     fromDate.setHours(0, 0, 0, 0)
     toDate.setHours(23, 59, 59, 999)
 
-    // Pobierz powtórki zestawów fiszek
-    const setReviews = await prisma.reviewSchedule.findMany({
-      where: {
-        set: { userId: session.user.id },
-        scheduledDate: {
-          gte: fromDate,
-          lte: toDate,
-        },
-      },
-      include: {
-        set: {
-          select: {
-            id: true,
-            name: true,
-            language: true,
-            _count: { select: { flashcards: true } },
+    // Pobierz powtórki zestawów fiszek i gramatyczne równolegle
+    const [setReviews, grammarReviews] = await Promise.all([
+      prisma.reviewSchedule.findMany({
+        where: {
+          set: { userId: session.user.id },
+          scheduledDate: {
+            gte: fromDate,
+            lte: toDate,
           },
         },
-      },
-      orderBy: { scheduledDate: 'asc' },
-    })
-
-    // Pobierz powtórki gramatyczne
-    const grammarReviews = await prisma.grammarReviewSchedule.findMany({
-      where: {
-        userId: session.user.id,
-        scheduledDate: {
-          gte: fromDate,
-          lte: toDate,
-        },
-      },
-      include: {
-        progress: {
-          select: {
-            moduleId: true,
-            language: true,
-            level: true,
+        include: {
+          set: {
+            select: {
+              id: true,
+              name: true,
+              language: true,
+              _count: { select: { flashcards: true } },
+            },
           },
         },
-      },
-      orderBy: { scheduledDate: 'asc' },
-    })
+        orderBy: { scheduledDate: 'asc' },
+      }),
+      prisma.grammarReviewSchedule.findMany({
+        where: {
+          userId: session.user.id,
+          scheduledDate: {
+            gte: fromDate,
+            lte: toDate,
+          },
+        },
+        include: {
+          progress: {
+            select: {
+              moduleId: true,
+              language: true,
+              level: true,
+            },
+          },
+        },
+        orderBy: { scheduledDate: 'asc' },
+      }),
+    ])
 
     // Przekształć powtórki gramatyczne do wspólnego formatu
     const formattedGrammarReviews = grammarReviews.map(review => {

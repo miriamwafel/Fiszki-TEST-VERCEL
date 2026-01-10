@@ -61,26 +61,29 @@ export async function POST(
 
     const { reviewDays } = await request.json()
 
-    // Pobierz ustawienia użytkownika lub użyj domyślnych
-    let days: number[] = reviewDays
-    if (!days || days.length === 0) {
-      const settings = await prisma.userSettings.findUnique({
+    // Pobierz ustawienia użytkownika i istniejące powtórki równolegle
+    const [settings, existingReviews] = await Promise.all([
+      prisma.userSettings.findUnique({
         where: { userId: session.user.id },
-      })
-      days = (settings?.defaultReviewDays as number[]) || [1, 5, 15, 35, 90]
-    }
-
-    // Pobierz wszystkie istniejące powtórki użytkownika DLA TEGO SAMEGO JĘZYKA (do sprawdzenia obłożenia)
-    const existingReviews = await prisma.reviewSchedule.findMany({
-      where: {
-        set: {
-          userId: session.user.id,
-          language: set.language, // Tylko zestawy w tym samym języku
+      }),
+      prisma.reviewSchedule.findMany({
+        where: {
+          set: {
+            userId: session.user.id,
+            language: set.language, // Tylko zestawy w tym samym języku
+          },
+          completed: false,
         },
-        completed: false,
-      },
-      select: { scheduledDate: true },
-    })
+        select: { scheduledDate: true },
+      }),
+    ])
+
+    // Ustaw dni powtórek z requestu lub z ustawień użytkownika
+    const days: number[] = (reviewDays && reviewDays.length > 0)
+      ? reviewDays
+      : (settings?.defaultReviewDays as number[]) || [1, 5, 15, 35, 90]
+
+    const maxReviewsPerDay = settings?.maxReviewsPerDay || 2
 
     // Policz powtórki na każdy dzień
     const reviewCountByDate: Record<string, number> = {}
@@ -88,12 +91,6 @@ export async function POST(
       const dateKey = review.scheduledDate.toISOString().split('T')[0]
       reviewCountByDate[dateKey] = (reviewCountByDate[dateKey] || 0) + 1
     }
-
-    // Pobierz maxReviewsPerDay
-    const settings = await prisma.userSettings.findUnique({
-      where: { userId: session.user.id },
-    })
-    const maxReviewsPerDay = settings?.maxReviewsPerDay || 2
 
     // Usuń stare harmonogramy dla tego zestawu
     await prisma.reviewSchedule.deleteMany({

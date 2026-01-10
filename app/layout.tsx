@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Providers } from '@/components/Providers'
 import { ServiceWorkerRegister } from '@/components/ServiceWorkerRegister'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin', 'latin-ext'] })
 
@@ -47,6 +48,15 @@ export default function RootLayout({
     <html lang="pl">
       <body className={inter.className}>
         <Providers>{children}</Providers>
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            duration: 4000,
+            className: 'font-sans',
+          }}
+        />
         <ServiceWorkerRegister />
       </body>
     </html>

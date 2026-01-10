@@ -8,16 +8,13 @@ export function ServiceWorkerRegister() {
       navigator.serviceWorker
         .register('/sw.js')
         .then((registration) => {
-          console.log('[PWA] Service Worker registered:', registration.scope)
-
           // Sprawdź aktualizacje
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing
             if (newWorker) {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  // Nowa wersja dostępna
-                  console.log('[PWA] New version available')
+                  // Nowa wersja dostępna - można dodać toast lub banner
                 }
               })
             }

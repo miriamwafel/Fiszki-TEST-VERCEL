@@ -73,7 +73,6 @@ export function LiveAudioRecorder({
       }
 
       const actualSampleRate = audioContext.sampleRate
-      console.log('Audio context sample rate:', actualSampleRate)
 
       const source = audioContext.createMediaStreamSource(stream)
       sourceRef.current = source

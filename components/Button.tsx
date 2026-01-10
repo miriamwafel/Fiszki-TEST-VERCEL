@@ -35,6 +35,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
         disabled={disabled || loading}
+        aria-disabled={disabled || loading}
+        aria-busy={loading}
         {...props}
       >
         {loading && (
@@ -42,6 +44,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             className="animate-spin -ml-1 mr-2 h-4 w-4"
             fill="none"
             viewBox="0 0 24 24"
+            aria-hidden="true"
           >
             <circle
               className="opacity-25"

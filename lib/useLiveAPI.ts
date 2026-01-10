@@ -82,8 +82,6 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
     wsRef.current = ws
 
     ws.onopen = () => {
-      console.log('WebSocket connected, sending setup...')
-
       // Wyślij konfigurację zgodnie z dokumentacją Google
       const setupMessage = {
         setup: {
@@ -110,10 +108,8 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
           // Zawsze próbuj sparsować jako JSON (Gemini wysyła wszystko jako JSON)
           try {
             const jsonData = JSON.parse(text)
-            console.log('Received JSON from blob:', jsonData)
 
             if (jsonData.setupComplete) {
-              console.log('Setup complete!')
               setupCompleteRef.current = true
               setConnectionState('connected')
               return
@@ -125,7 +121,6 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
                 if (part.inlineData?.mimeType?.startsWith('audio/')) {
                   setIsModelSpeaking(true)
                   const audioBuffer = base64ToArrayBuffer(part.inlineData.data)
-                  console.log('Received audio from JSON:', audioBuffer.byteLength, 'bytes')
                   setAudioQueue(prev => [...prev, audioBuffer])
                 }
                 if (part.text) {
@@ -136,14 +131,12 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
             }
 
             if (jsonData.serverContent?.turnComplete) {
-              console.log('Turn complete')
               setIsModelSpeaking(false)
             }
 
             return
           } catch {
             // Nie jest JSON - traktuj jako surowe audio
-            console.log('Received raw audio blob:', arrayBuffer.byteLength, 'bytes')
             setIsModelSpeaking(true)
             setAudioQueue(prev => [...prev, arrayBuffer])
             return
@@ -152,10 +145,8 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
 
         // Obsłuż JSON
         const message: ServerMessage = JSON.parse(event.data)
-        console.log('Received JSON message:', message)
 
         if (message.setupComplete) {
-          console.log('Setup complete!')
           setupCompleteRef.current = true
           setConnectionState('connected')
           return
@@ -188,7 +179,6 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
           }
 
           if (turnComplete) {
-            console.log('Turn complete')
             setIsModelSpeaking(false)
             // Reset tekstu po zakończeniu tury - następna odpowiedź zacznie od nowa
           }
@@ -203,8 +193,7 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
       setConnectionState('error')
     }
 
-    ws.onclose = (event) => {
-      console.log('WebSocket closed:', event.code, event.reason)
+    ws.onclose = () => {
       // Nie ustawiaj disconnected jeśli był error - żeby nie próbować reconnect
       if (connectionState !== 'error') {
         setConnectionState('error') // Ustaw error zamiast disconnected żeby zatrzymać reconnect
@@ -228,11 +217,6 @@ export function useLiveAPI(config: LiveAPIConfig): UseLiveAPIReturn {
     if (wsRef.current?.readyState !== WebSocket.OPEN || !setupCompleteRef.current) {
       console.warn('Cannot send audio: not connected')
       return
-    }
-
-    // Loguj tylko co 10 wysłany chunk żeby nie zaśmiecać konsoli
-    if (Math.random() < 0.1) {
-      console.log('Sending audio chunk:', audioData.byteLength, 'bytes')
     }
 
     const message = {

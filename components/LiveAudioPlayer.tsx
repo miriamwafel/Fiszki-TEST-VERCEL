@@ -32,7 +32,6 @@ export function LiveAudioPlayer({
     async (buffer: ArrayBuffer): Promise<void> => {
       // Pomiń zbyt małe bufory (prawdopodobnie kontrolne, nie audio)
       if (buffer.byteLength < 100) {
-        console.log('Skipping small buffer:', buffer.byteLength, 'bytes')
         return
       }
 
@@ -41,7 +40,6 @@ export function LiveAudioPlayer({
       if (buffer.byteLength % 2 !== 0) {
         // Przytnij do parzystej długości
         audioBuffer = buffer.slice(0, buffer.byteLength - 1)
-        console.log('Trimmed buffer from', buffer.byteLength, 'to', audioBuffer.byteLength)
       }
 
       if (audioBuffer.byteLength === 0) {
@@ -113,7 +111,6 @@ export function LiveAudioPlayer({
     // Dodaj tylko elementy które jeszcze nie były przetworzone
     const newItems = audioQueue.slice(processedCountRef.current)
     if (newItems.length > 0) {
-      console.log('Adding', newItems.length, 'new audio items to queue')
       queueRef.current.push(...newItems)
       processedCountRef.current = audioQueue.length
       processQueue()
