@@ -5,6 +5,9 @@ import prisma from '@/lib/db'
 import { Card } from '@/components/Card'
 import { ReviewCalendar } from '@/components/ReviewCalendar'
 
+// Wymuś dynamiczne renderowanie - zawsze świeże dane
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
 

@@ -32,7 +32,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   const fetchReviews = useCallback(async () => {
     setError(null)
     try {
-      const response = await fetch(`/api/sets/${setId}/reviews`)
+      const response = await fetch(`/api/sets/${setId}/reviews`, { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setReviews(data)

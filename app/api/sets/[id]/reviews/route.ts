@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
 
+// Wymuś dynamiczne renderowanie - nigdy nie cachuj
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // GET - pobierz harmonogram powtórek dla zestawu
 export async function GET(
   request: Request,

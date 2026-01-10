@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { getModuleById } from '@/lib/grammar-modules'
 
+// Wymuś dynamiczne renderowanie - nigdy nie cachuj
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // GET - pobierz wszystkie zaplanowane powtórki użytkownika (do kalendarza)
 export async function GET(request: Request) {
   try {

@@ -92,17 +92,16 @@ export function ReviewCalendar() {
   const fetchReviews = useCallback(async () => {
     setError(null)
     try {
-      const response = await fetch('/api/reviews')
+      // cache: 'no-store' + timestamp wymusza świeże dane (omija wszystkie cache)
+      const response = await fetch(`/api/reviews?_t=${Date.now()}`, { cache: 'no-store' })
       if (response.ok) {
         const data = await response.json()
         setReviews(data.reviews || [])
         lastFetchTimeRef.current = Date.now()
       } else {
-        console.error('Failed to fetch reviews:', response.status)
         setError('Nie udało się załadować powtórek')
       }
-    } catch (error) {
-      console.error('Failed to fetch reviews:', error)
+    } catch {
       setError('Błąd połączenia z serwerem')
     } finally {
       setLoading(false)
