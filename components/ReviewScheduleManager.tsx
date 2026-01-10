@@ -78,6 +78,8 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
   }
 
   const markCompleted = async (reviewId: string) => {
+    console.log('[markCompleted] Start:', { reviewId, setId })
+
     // Optimistic update
     const previousReviews = [...reviews]
     setReviews(reviews.map(r =>
@@ -85,25 +87,33 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
     ))
 
     try {
-      const response = await fetch(`/api/sets/${setId}/reviews`, {
+      const url = `/api/sets/${setId}/reviews`
+      console.log('[markCompleted] Wysyłam PUT do:', url)
+
+      const response = await fetch(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reviewId, completed: true }),
       })
 
+      console.log('[markCompleted] Response status:', response.status, response.ok)
+
       if (response.ok) {
+        const data = await response.json()
+        console.log('[markCompleted] Sukces! Dane:', data)
         // Emit event dla innych komponentów (np. ReviewCalendar)
         emitReviewsUpdated({ type: 'completed', reviewId, setId })
       } else {
         // Revert on failure
+        const errorData = await response.json().catch(() => ({}))
+        console.error('[markCompleted] Błąd API:', response.status, errorData)
         setReviews(previousReviews)
-        console.error('Failed to mark review as completed:', response.status)
-        alert('Nie udało się oznaczyć jako ukończone. Spróbuj ponownie.')
+        alert(`Nie udało się oznaczyć jako ukończone (${response.status}). ${errorData.error || ''}`)
       }
     } catch (error) {
       // Revert on error
+      console.error('[markCompleted] Wyjątek:', error)
       setReviews(previousReviews)
-      console.error('Failed to mark review as completed:', error)
       alert('Błąd połączenia. Spróbuj ponownie.')
     }
   }
