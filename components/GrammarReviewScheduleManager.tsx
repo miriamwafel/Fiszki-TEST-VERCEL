@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/Button'
+import { emitReviewsUpdated } from '@/lib/hooks/useReviewsSync'
 
 interface Review {
   id: string
@@ -62,6 +63,7 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
         const data = await response.json()
         setReviews(data)
         setExpanded(true)
+        emitReviewsUpdated({ type: 'created' })
       } else {
         console.error('Failed to create schedule:', response.status)
         alert('Nie udało się utworzyć harmonogramu. Spróbuj ponownie.')
@@ -88,7 +90,9 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
         body: JSON.stringify({ reviewId, completed: true }),
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        emitReviewsUpdated({ type: 'completed', reviewId })
+      } else {
         // Revert on failure
         setReviews(previousReviews)
         console.error('Failed to mark review as completed:', response.status)
@@ -141,7 +145,9 @@ export function GrammarReviewScheduleManager({ moduleId, moduleName }: GrammarRe
         method: 'DELETE',
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        emitReviewsUpdated({ type: 'deleted', reviewId })
+      } else {
         // Revert on failure
         setReviews(previousReviews)
         console.error('Failed to delete review:', response.status)

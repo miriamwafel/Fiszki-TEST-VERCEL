@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
+import { shouldRefetchReviews } from '@/lib/hooks/useReviewsSync'
 
 interface SetReviewItem {
   id: string
@@ -86,14 +87,16 @@ export function ReviewCalendar() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const lastFetchTimeRef = useRef<number>(0)
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     setError(null)
     try {
       const response = await fetch('/api/reviews')
       if (response.ok) {
         const data = await response.json()
         setReviews(data.reviews || [])
+        lastFetchTimeRef.current = Date.now()
       } else {
         console.error('Failed to fetch reviews:', response.status)
         setError('Nie udało się załadować powtórek')
@@ -104,20 +107,54 @@ export function ReviewCalendar() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
+  // Initial fetch
   useEffect(() => {
     fetchReviews()
-  }, [])
+  }, [fetchReviews])
+
+  // Nasłuchuj na zmiany z innych komponentów (np. ReviewScheduleManager)
+  useEffect(() => {
+    const handleReviewsUpdated = () => {
+      fetchReviews()
+    }
+
+    window.addEventListener('reviews-updated', handleReviewsUpdated)
+    return () => window.removeEventListener('reviews-updated', handleReviewsUpdated)
+  }, [fetchReviews])
+
+  // Sprawdź przy mount czy dane mogły się zmienić (np. po powrocie z innej strony)
+  useEffect(() => {
+    if (shouldRefetchReviews(lastFetchTimeRef.current)) {
+      fetchReviews()
+    }
+  }, [fetchReviews])
 
   // Refetch when window gains focus (user returns to tab)
   useEffect(() => {
     const handleFocus = () => {
-      fetchReviews()
+      // Sprawdź czy warto refetchować (czy coś się zmieniło)
+      if (shouldRefetchReviews(lastFetchTimeRef.current)) {
+        fetchReviews()
+      }
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [])
+  }, [fetchReviews])
+
+  // Refetch przy nawigacji (visibilitychange)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (shouldRefetchReviews(lastFetchTimeRef.current)) {
+          fetchReviews()
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [fetchReviews])
 
   // Generuj 14 dni od dziś
   const days: Date[] = []

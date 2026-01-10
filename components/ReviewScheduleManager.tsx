@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/Button'
 import { Card } from '@/components/Card'
+import { emitReviewsUpdated } from '@/lib/hooks/useReviewsSync'
 
 interface Review {
   id: string
@@ -63,6 +64,7 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
         const data = await response.json()
         setReviews(data)
         setExpanded(true)
+        emitReviewsUpdated({ type: 'created', setId })
       } else {
         console.error('Failed to create schedule:', response.status)
         alert('Nie udało się utworzyć harmonogramu. Spróbuj ponownie.')
@@ -89,7 +91,10 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
         body: JSON.stringify({ reviewId, completed: true }),
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        // Emit event dla innych komponentów (np. ReviewCalendar)
+        emitReviewsUpdated({ type: 'completed', reviewId, setId })
+      } else {
         // Revert on failure
         setReviews(previousReviews)
         console.error('Failed to mark review as completed:', response.status)
@@ -142,7 +147,9 @@ export function ReviewScheduleManager({ setId, setCreatedAt }: ReviewScheduleMan
         method: 'DELETE',
       })
 
-      if (!response.ok) {
+      if (response.ok) {
+        emitReviewsUpdated({ type: 'deleted', reviewId, setId })
+      } else {
         // Revert on failure
         setReviews(previousReviews)
         console.error('Failed to delete review:', response.status)
