@@ -139,6 +139,32 @@ export default function VocabularyIndexPage() {
     localStorage.setItem('cefrTargets', JSON.stringify(targets))
   }
 
+  const deleteVocabulary = async (language: string, level?: string) => {
+    const confirmMsg = level
+      ? `Usunąć wszystkie słowa ${level} dla ${languageNames[language]}?`
+      : `Usunąć CAŁĄ bazę słów dla ${languageNames[language]}?`
+
+    if (!confirm(confirmMsg)) return
+
+    try {
+      const response = await fetch(`/api/vocabulary/${language}/delete-all`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: level ? JSON.stringify({ level }) : undefined,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`Usunięto ${data.deleted} słów`)
+        await fetchLanguages()
+      } else {
+        toast.error('Błąd usuwania')
+      }
+    } catch {
+      toast.error('Błąd połączenia')
+    }
+  }
+
   const generateVocabulary = async (language: string, level: string) => {
     if (generating) return
 
@@ -510,32 +536,47 @@ export default function VocabularyIndexPage() {
               Wygeneruje brakujące słowa dla wszystkich poziomów. Może trwać kilka minut.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-              {supportedLanguages.map(lang => (
+              {supportedLanguages.map(lang => {
+                const langWordCount = languages.find(l => l.language === lang)?.total || 0
+                return (
                 <div key={`full-${lang}`} className="flex items-center gap-2 bg-white rounded-lg p-3 border border-purple-300">
                   <span className="text-2xl">{languageFlags[lang]}</span>
                   <div className="flex-1">
                     <div className="font-medium text-gray-900">{languageNames[lang]}</div>
                     <div className="text-xs text-gray-500">
-                      {languages.find(l => l.language === lang)?.total || 0} słów
+                      {langWordCount} słów
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => generateFullVocabulary(lang)}
-                    disabled={generatingFull !== null || generating !== null}
-                    className="bg-purple-600 hover:bg-purple-700"
-                  >
-                    {generatingFull === lang ? (
-                      <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 border-2 border-white/30 rounded-full animate-spin border-t-white" />
-                        Generuję...
-                      </span>
-                    ) : (
-                      'Pełna baza'
+                  <div className="flex gap-1">
+                    {langWordCount > 0 && (
+                      <button
+                        onClick={() => deleteVocabulary(lang)}
+                        disabled={generatingFull !== null || generating !== null}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded text-sm"
+                        title="Usuń bazę"
+                      >
+                        🗑️
+                      </button>
                     )}
-                  </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => generateFullVocabulary(lang)}
+                      disabled={generatingFull !== null || generating !== null}
+                      className="bg-purple-600 hover:bg-purple-700"
+                    >
+                      {generatingFull === lang ? (
+                        <span className="flex items-center gap-1">
+                          <div className="w-3 h-3 border-2 border-white/30 rounded-full animate-spin border-t-white" />
+                          Generuję...
+                        </span>
+                      ) : (
+                        'Pełna baza'
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              ))}
+              )
+              })}
             </div>
           </div>
 
