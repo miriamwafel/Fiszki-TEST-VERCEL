@@ -133,7 +133,7 @@ interface Story {
   wordCount: number
   createdAt: string
   vocabulary?: { word: string; translation: string }[]
-  targetWords?: { word: string; translation: string }[] // Słowa z bazy słownictwa
+  targetWords?: { word: string; translation: string; level?: string }[] // Słowa z bazy słownictwa
   sets?: LinkedSet[]
 }
 
@@ -991,16 +991,21 @@ export default function StoriesPage() {
                     Słowa do nauki z bazy słownictwa
                   </h3>
                   <p className="text-xs text-gray-500 mb-3">
-                    Te słowa zostały wybrane specjalnie dla Ciebie z bazy słownictwa - to słowa, których jeszcze nie znasz!
+                    Te słowa zostały wybrane specjalnie dla Ciebie - najpierw podstawowe (A1), potem trudniejsze.
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {selectedStory.targetWords.map((item, index) => (
                       <button
                         key={index}
                         onClick={() => setWordModal(item)}
-                        className="text-left p-2 bg-emerald-50 rounded hover:bg-emerald-100 transition-colors border border-emerald-200"
+                        className="text-left p-2 bg-emerald-50 rounded hover:bg-emerald-100 transition-colors border border-emerald-200 relative"
                       >
-                        <p className="font-medium text-gray-900 text-sm">
+                        {item.level && (
+                          <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded font-medium">
+                            {item.level}
+                          </span>
+                        )}
+                        <p className="font-medium text-gray-900 text-sm pr-8">
                           {item.word}
                         </p>
                         <p className="text-emerald-600 text-xs">{item.translation}</p>

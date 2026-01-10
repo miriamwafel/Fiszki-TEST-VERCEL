@@ -37,6 +37,7 @@ export default function VocabularyIndexPage() {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [generating, setGenerating] = useState<string | null>(null)
+  const [generatingFull, setGeneratingFull] = useState<string | null>(null)
 
   const fetchLanguages = async () => {
     try {
@@ -111,6 +112,39 @@ export default function VocabularyIndexPage() {
     }
   }
 
+  const generateFullVocabulary = async (language: string) => {
+    if (generatingFull) return
+
+    setGeneratingFull(language)
+    toast.info(`Generuję pełną bazę słów ${languageNames[language]} (~2000 słów, wszystkie poziomy)...`, {
+      duration: 120000, // 2 minuty
+      description: 'To może potrwać kilka minut. Nie zamykaj strony.',
+    })
+
+    try {
+      const response = await fetch(`/api/vocabulary/${language}/generate-full`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        toast.success(`Wygenerowano ${data.totalCreated} słów dla ${languageNames[language]}!`, {
+          description: `Pominięto ${data.totalSkipped} duplikatów`,
+        })
+        // Odśwież listę
+        await fetchLanguages()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Błąd generowania')
+      }
+    } catch {
+      toast.error('Błąd połączenia')
+    } finally {
+      setGeneratingFull(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -136,44 +170,84 @@ export default function VocabularyIndexPage() {
       </div>
 
       {/* Panel admina - generowanie bazy */}
-      {isAdmin && languagesEmpty.length > 0 && (
+      {isAdmin && (
         <Card className="p-6 mb-8 border-purple-200 bg-purple-50">
           <h2 className="text-lg font-bold text-purple-900 mb-4 flex items-center gap-2">
             <span>⚙️</span> Panel admina - Wygeneruj bazę słownictwa
           </h2>
-          <p className="text-sm text-purple-700 mb-4">
-            Kliknij przycisk aby wygenerować bazę najważniejszych słów dla wybranego języka.
-            Generowanie trwa ok. 30-60 sekund.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-            {languagesEmpty.map(lang => (
-              <div key={lang} className="flex items-center gap-2 bg-white rounded-lg p-3 border border-purple-200">
-                <span className="text-2xl">{languageFlags[lang]}</span>
-                <div className="flex-1">
-                  <div className="font-medium text-gray-900">{languageNames[lang]}</div>
-                  <div className="text-xs text-gray-500">Brak bazy</div>
+
+          {/* Generowanie pełnej bazy */}
+          <div className="mb-6">
+            <h3 className="font-semibold text-purple-800 mb-2">Generuj pełną bazę (~2000 słów)</h3>
+            <p className="text-sm text-purple-700 mb-3">
+              Wygeneruje ~333 słów dla każdego poziomu (A1, A2, B1, B2, C1, C2).
+              Trwa kilka minut - nie zamykaj strony.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {supportedLanguages.map(lang => (
+                <div key={`full-${lang}`} className="flex items-center gap-2 bg-white rounded-lg p-3 border border-purple-300">
+                  <span className="text-2xl">{languageFlags[lang]}</span>
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">{languageNames[lang]}</div>
+                    <div className="text-xs text-gray-500">
+                      {languages.find(l => l.language === lang)?.total || 0} słów
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => generateFullVocabulary(lang)}
+                    disabled={generatingFull !== null || generating !== null}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    {generatingFull === lang ? (
+                      <span className="flex items-center gap-1">
+                        <div className="w-3 h-3 border-2 border-white/30 rounded-full animate-spin border-t-white" />
+                        Generuję...
+                      </span>
+                    ) : (
+                      'Pełna baza'
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => generateVocabulary(lang, 'A1')}
-                  disabled={generating !== null}
-                  className="bg-purple-600 hover:bg-purple-700"
-                >
-                  {generating === lang ? (
-                    <span className="flex items-center gap-1">
-                      <div className="w-3 h-3 border-2 border-white/30 rounded-full animate-spin border-t-white" />
-                      Generuję...
-                    </span>
-                  ) : (
-                    'Generuj'
-                  )}
-                </Button>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-          <p className="text-xs text-purple-600 mt-3">
-            Domyślnie generuje 200 słów poziomu A1-A2. Możesz wygenerować więcej uruchamiając ponownie dla B1, B2 itd.
-          </p>
+
+          {/* Szybkie generowanie dla pustych języków */}
+          {languagesEmpty.length > 0 && (
+            <div className="pt-4 border-t border-purple-200">
+              <h3 className="font-semibold text-purple-800 mb-2">Szybkie generowanie (200 słów A1)</h3>
+              <p className="text-sm text-purple-700 mb-3">
+                Szybsza opcja do testów - generuje tylko 200 słów poziomu A1.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {languagesEmpty.map(lang => (
+                  <div key={lang} className="flex items-center gap-2 bg-white rounded-lg p-3 border border-purple-200">
+                    <span className="text-2xl">{languageFlags[lang]}</span>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{languageNames[lang]}</div>
+                      <div className="text-xs text-gray-500">Brak bazy</div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => generateVocabulary(lang, 'A1')}
+                      disabled={generating !== null || generatingFull !== null}
+                    >
+                      {generating === lang ? (
+                        <span className="flex items-center gap-1">
+                          <div className="w-3 h-3 border-2 border-gray-400 rounded-full animate-spin border-t-gray-600" />
+                          ...
+                        </span>
+                      ) : (
+                        'Szybki test'
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -259,10 +333,11 @@ export default function VocabularyIndexPage() {
       <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h3 className="font-semibold text-blue-900 mb-2">Jak to działa?</h3>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Każdy język ma bazę najważniejszych słów uporządkowanych według częstotliwości użycia</li>
+          <li>• Każdy język ma bazę najważniejszych słów uporządkowanych według poziomów (A1 → A2 → B1 → B2 → C1 → C2)</li>
           <li>• Oznaczaj słowa jako "znane", "w nauce" lub "nieznane"</li>
-          <li>• Gdy dodajesz fiszki, odpowiadające słowa są automatycznie oznaczane</li>
-          <li>• Historyjki AI będą używać słów, których jeszcze nie znasz</li>
+          <li>• Gdy dodajesz fiszki, odpowiadające słowa są automatycznie oznaczane jako "w nauce"</li>
+          <li>• <strong>Historyjki AI automatycznie wybierają słowa</strong> - najpierw podstawowe (A1), potem trudniejsze</li>
+          <li>• Nie musisz wybierać poziomu słów - system sam wie jakie słowa powinieneś znać!</li>
         </ul>
       </div>
     </div>

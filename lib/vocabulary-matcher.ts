@@ -278,16 +278,24 @@ export async function markWordAsLearning(
 }
 
 /**
+ * Kolejność poziomów - od najprostszego
+ */
+const LEVEL_ORDER = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+
+/**
  * Pobiera słowa z bazy, których użytkownik jeszcze nie zna
- * (do użycia przy generowaniu historyjek)
+ * PRIORYTETYZUJE niższe poziomy: najpierw A1, potem A2, B1, itd.
+ * Dzięki temu nawet przy historii B1, najpierw użyje nieznanych słów z A1/A2
+ *
+ * @param maxLevel - opcjonalnie ogranicz do danego poziomu i niższych (np. 'B1' = A1, A2, B1)
  */
 export async function getUnknownWords(
   userId: string,
   language: string,
   count: number = 10,
-  level?: string
-): Promise<Array<{ word: string; translation: string; frequencyRank: number }>> {
-  // Pobierz ID słówek, które użytkownik już zna
+  maxLevel?: string
+): Promise<Array<{ word: string; translation: string; frequencyRank: number; level: string }>> {
+  // Pobierz ID słówek, które użytkownik już zna/uczy się
   const knownVocabIds = await prisma.userVocabularyProgress.findMany({
     where: {
       userId,
@@ -297,28 +305,42 @@ export async function getUnknownWords(
     select: { vocabularyId: true },
   })
 
-  const knownIds = knownVocabIds.map(v => v.vocabularyId)
+  const knownIds = knownVocabIds.map((v: { vocabularyId: string }) => v.vocabularyId)
 
-  // Pobierz następne nieznane słowa
-  const whereClause: Record<string, unknown> = {
-    language,
-    id: { notIn: knownIds },
+  // Ustal które poziomy brać pod uwagę
+  let levelsToInclude = LEVEL_ORDER
+  if (maxLevel) {
+    const maxIndex = LEVEL_ORDER.indexOf(maxLevel.toUpperCase())
+    if (maxIndex !== -1) {
+      levelsToInclude = LEVEL_ORDER.slice(0, maxIndex + 1)
+    }
   }
 
-  if (level) {
-    whereClause.level = level
+  // Pobieraj słowa poziom po poziomie, zaczynając od A1
+  const result: Array<{ word: string; translation: string; frequencyRank: number; level: string }> = []
+
+  for (const level of levelsToInclude) {
+    if (result.length >= count) break
+
+    const remaining = count - result.length
+    const words = await prisma.vocabularyBase.findMany({
+      where: {
+        language,
+        level,
+        id: { notIn: knownIds },
+      },
+      orderBy: { frequencyRank: 'asc' },
+      take: remaining,
+      select: {
+        word: true,
+        translation: true,
+        frequencyRank: true,
+        level: true,
+      },
+    })
+
+    result.push(...words)
   }
 
-  const words = await prisma.vocabularyBase.findMany({
-    where: whereClause,
-    orderBy: { frequencyRank: 'asc' },
-    take: count,
-    select: {
-      word: true,
-      translation: true,
-      frequencyRank: true,
-    },
-  })
-
-  return words
+  return result
 }

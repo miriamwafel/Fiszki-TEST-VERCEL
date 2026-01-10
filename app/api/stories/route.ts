@@ -69,16 +69,22 @@ export async function POST(request: Request) {
 
     const languageName = languageNames[language] || language
 
-    // Pobierz nieznane słowa z bazy słownictwa dla tego poziomu
-    let targetWordsData: Array<{ word: string; translation: string }> = []
+    // Pobierz nieznane słowa z bazy słownictwa
+    // PRIORYTET: A1 → A2 → B1 → B2 → C1 → C2 (niezależnie od wybranego poziomu historii)
+    // maxLevel = difficulty oznacza że dla historii B1 weźmie słowa A1, A2, B1
+    let targetWordsData: Array<{ word: string; translation: string; level: string }> = []
     try {
       const unknownWords = await getUnknownWords(
         session.user.id,
         language,
         10, // Max 10 słów do włączenia w historię
-        difficulty // Filtruj po poziomie trudności
+        difficulty // maxLevel - weź słowa do tego poziomu włącznie, priorytetyzując niższe
       )
-      targetWordsData = unknownWords.map(w => ({ word: w.word, translation: w.translation }))
+      targetWordsData = unknownWords.map(w => ({
+        word: w.word,
+        translation: w.translation,
+        level: w.level
+      }))
     } catch (err) {
       console.error('Failed to get unknown words:', err)
       // Kontynuuj bez target words jeśli baza słownictwa jest pusta
