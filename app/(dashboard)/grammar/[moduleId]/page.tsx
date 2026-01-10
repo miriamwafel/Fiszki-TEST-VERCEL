@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useMemo } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
 import { GrammarReviewScheduleManager } from '@/components/ReviewScheduleManager'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { usePageContent, type PageContentData } from '@/lib/hooks/usePageContent'
 
 interface ModuleData {
   module: {
@@ -115,6 +116,26 @@ export default function GrammarModulePage({ params }: { params: Promise<{ module
   const [customQuestion, setCustomQuestion] = useState('')
   const [addingToTheory, setAddingToTheory] = useState(false)
   const [addedToTheory, setAddedToTheory] = useState(false)
+
+  // Rejestruj zawartość gramatyki dla AI Chat
+  const pageContentData = useMemo((): PageContentData | null => {
+    if (!moduleData) return null
+    return {
+      type: 'grammar',
+      title: moduleData.module.titlePl,
+      language: moduleData.grammar.language,
+      level: moduleData.level.level,
+      grammar: {
+        title: moduleData.module.titlePl,
+        language: moduleData.grammar.language,
+        level: moduleData.level.level,
+        topic: moduleData.module.descriptionPl,
+        explanation: moduleData.progress?.generatedContent || undefined,
+      },
+    }
+  }, [moduleData])
+
+  usePageContent(pageContentData)
 
   useEffect(() => {
     fetchModule()

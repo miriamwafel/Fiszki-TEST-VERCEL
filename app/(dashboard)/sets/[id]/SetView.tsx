@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
@@ -14,6 +14,7 @@ import {
   type CachedTranslation,
 } from '@/lib/cache'
 import { ReviewScheduleManager } from '@/components/ReviewScheduleManager'
+import { usePageContent, type PageContentData } from '@/lib/hooks/usePageContent'
 
 const translationMessages = [
   'AI analizuje słowo...',
@@ -106,6 +107,23 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
     partOfSpeech: '',
   })
   const [editLoading, setEditLoading] = useState(false)
+
+  // Rejestruj zawartość zestawu dla AI Chat
+  const pageContentData = useMemo((): PageContentData => ({
+    type: 'flashcards',
+    title: `Zestaw: ${set.name}`,
+    language: set.language,
+    flashcards: set.flashcards.map(f => ({
+      word: f.word,
+      translation: f.translation,
+      example: f.context || undefined,
+    })),
+    additionalContext: set.story
+      ? `Ten zestaw pochodzi z historyjki "${set.story.title}"`
+      : undefined,
+  }), [set])
+
+  usePageContent(pageContentData)
 
   const handleTranslate = async (e: React.FormEvent) => {
     e.preventDefault()

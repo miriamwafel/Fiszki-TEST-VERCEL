@@ -3,6 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
+import {
+  usePageContentListener,
+  formatPageContentForAI,
+  type PageContentData
+} from '@/lib/hooks/usePageContent'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -19,6 +24,8 @@ interface PageContext {
     translation?: string
     sentence?: string
   }
+  /** Pełna zawartość strony (fiszki, historia, gramatyka) */
+  pageContent?: string
 }
 
 // Custom event for opening AI chat with a question
@@ -49,8 +56,14 @@ export function AIChatWidget() {
   const [exerciseContext, setExerciseContext] = useState<PageContext['exerciseContext']>()
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [pageContentData, setPageContentData] = useState<PageContentData | null>(null)
 
   const pathname = usePathname()
+
+  // Nasłuchuj na zmiany zawartości strony (fiszki, historie, gramatyka)
+  usePageContentListener(useCallback((data: PageContentData | null) => {
+    setPageContentData(data)
+  }, []))
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const widgetRef = useRef<HTMLDivElement>(null)
@@ -165,8 +178,9 @@ export function AIChatWidget() {
       pageTitle: contextDescription || pageTitle,
       selectedText: showSelectedText ? selectedText : undefined,
       exerciseContext,
+      pageContent: formatPageContentForAI(pageContentData),
     }
-  }, [pathname, selectedText, showSelectedText, exerciseContext])
+  }, [pathname, selectedText, showSelectedText, exerciseContext, pageContentData])
 
   // Simulate typing effect
   const simulateTyping = useCallback((fullText: string) => {

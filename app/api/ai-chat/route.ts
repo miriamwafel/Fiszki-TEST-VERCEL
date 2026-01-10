@@ -12,6 +12,8 @@ interface PageContext {
     translation?: string
     sentence?: string
   }
+  /** Pełna zawartość strony sformatowana dla AI */
+  pageContent?: string
 }
 
 interface ConversationMessage {
@@ -62,6 +64,11 @@ export async function POST(request: Request) {
           contextInfo += `- Zdanie: ${context.exerciseContext.sentence}\n`
         }
       }
+
+      // Pełna zawartość strony (fiszki, historia, gramatyka)
+      if (context.pageContent) {
+        contextInfo += context.pageContent
+      }
     }
 
     // Build conversation history for prompt
@@ -83,21 +90,28 @@ Twoja rola:
 3. Podajesz przykłady zdań i zastosowań
 4. Odpowiadasz na pytania dotyczące nauki języków
 5. Jeśli użytkownik zaznaczył tekst na stronie, pomagasz go zrozumieć
-6. Znasz kontekst strony na której jest użytkownik i dostosujesz odpowiedzi
+
+BARDZO WAŻNE - KONTEKST:
+- Masz dostęp do zawartości strony, którą użytkownik aktualnie przegląda
+- Gdy użytkownik pyta o słówko, SPRAWDŹ czy jest w zestawie fiszek lub historyjce
+- Jeśli słówko jest w kontekście, użyj tego kontekstu do lepszej odpowiedzi
+- Słowa mogą mieć różne znaczenia - użyj kontekstu strony aby wybrać właściwe
+- NIE podpowiadaj proaktywnie - odpowiadaj tylko na pytania użytkownika
+- NIE mów użytkownikowi co powinien zrobić - tylko odpowiadaj na jego pytania
 
 Styl odpowiedzi:
 - Odpowiadaj po polsku, ale słowa/frazy w języku obcym podawaj w oryginale
 - Bądź zwięzły ale pomocny (2-4 zdania dla prostych pytań, więcej dla złożonych)
 - Używaj formatowania markdown gdy to pomaga (np. listy, **pogrubienia**)
-- Przy tłumaczeniach podawaj też kontekst użycia
+- Przy tłumaczeniach podawaj też kontekst użycia z zestawu/historyjki jeśli dostępny
 - Dla czasowników wskaż formę podstawową (bezokolicznik)
-- Bądź przyjazny i zachęcający do nauki
+- Bądź przyjazny ale nie przesadzaj z zachęcaniem
 ${contextInfo}
 ${historyText}
 
 Użytkownik napisał: "${message}"
 
-Odpowiedz pomocnie i zwięźle.`
+Odpowiedz pomocnie i zwięźle, wykorzystując kontekst strony jeśli jest dostępny.`
 
     const result = await gemini.generateContent(systemPrompt)
     const response = result.response.text()
