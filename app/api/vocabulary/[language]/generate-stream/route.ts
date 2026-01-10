@@ -22,16 +22,88 @@ const languageNames: Record<string, string> = {
   it: 'włoski',
 }
 
-function getLevelGuidelines(level: string): string {
-  const guidelines: Record<string, string> = {
-    A1: `Poziom A1 - PODSTAWOWE PRZETRWANIE: powitania, liczby, kolory, rodzina, jedzenie, dni tygodnia`,
-    A2: `Poziom A2 - CODZIENNE SYTUACJE: zakupy, podróże, praca, hobby, pogoda, zdrowie`,
-    B1: `Poziom B1 - WYRAŻANIE OPINII: opinie, uczucia złożone, doświadczenia, plany, edukacja`,
-    B2: `Poziom B2 - ABSTRAKCJA: idiomy, słowa abstrakcyjne, argumentacja, polityka`,
-    C1: `Poziom C1 - SPECJALISTYCZNE: formalne, akademickie, terminy biznesowe`,
-    C2: `Poziom C2 - BIEGŁOŚĆ: słowa rzadkie, literackie, subtelne różnice`,
+function getLevelGuidelines(level: string, batchNum: number): string {
+  // Różne kategorie dla różnych batchy - żeby AI generował różnorodne słowa
+  const categoryRotation: Record<string, string[]> = {
+    A1: [
+      'powitania, pożegnania, uprzejmości',
+      'liczby, dni tygodnia, miesiące',
+      'kolory, kształty, rozmiary',
+      'rodzina, relacje, ludzie',
+      'jedzenie, napoje, posiłki',
+      'dom, pokoje, meble',
+      'ciało, ubrania, wygląd',
+      'podstawowe czasowniki (być, mieć, iść, jeść, pić)',
+    ],
+    A2: [
+      'zakupy, sklepy, pieniądze',
+      'transport, podróże, kierunki',
+      'praca, zawody, obowiązki',
+      'hobby, sport, rozrywka',
+      'pogoda, pory roku, natura',
+      'zdrowie, lekarz, ciało',
+      'uczucia, emocje, charaktery',
+      'czasowniki codzienne (kupować, sprzedawać, rezerwować)',
+    ],
+    B1: [
+      'opinie, argumenty, dyskusje',
+      'doświadczenia, wspomnienia',
+      'plany, marzenia, cele',
+      'edukacja, szkoła, studia',
+      'media, internet, technologia',
+      'środowisko, ekologia',
+      'kultura, sztuka, muzyka',
+      'czasowniki wyrażania opinii (uważać, sądzić, wierzyć)',
+    ],
+    B2: [
+      'idiomy i wyrażenia idiomatyczne',
+      'słowa abstrakcyjne (wolność, sprawiedliwość)',
+      'polityka, społeczeństwo',
+      'ekonomia, biznes, finanse',
+      'nauka, badania, odkrycia',
+      'prawo, przestępczość',
+      'psychologia, zachowania',
+      'zaawansowane łączniki i spójniki',
+    ],
+    C1: [
+      'terminologia akademicka',
+      'język formalny, oficjalny',
+      'terminy prawnicze',
+      'słownictwo biznesowe zaawansowane',
+      'medycyna, nauki ścisłe',
+      'filozofia, etyka',
+      'retoryka, perswazja',
+      'rzadsze synonimy popularnych słów',
+    ],
+    C2: [
+      'słowa archaiczne, literackie',
+      'regionalizmy, dialekty',
+      'żargon specjalistyczny',
+      'subtelne różnice znaczeniowe',
+      'eufemizmy, metafory',
+      'słowa z konotacjami kulturowymi',
+      'rzadkie idiomy',
+      'język poetycki',
+    ],
   }
-  return guidelines[level] || level
+
+  const categories = categoryRotation[level] || categoryRotation['A2']
+  const categoryIndex = (batchNum - 1) % categories.length
+  const currentCategory = categories[categoryIndex]
+
+  const levelDescriptions: Record<string, string> = {
+    A1: 'Poziom A1 - PODSTAWOWE PRZETRWANIE',
+    A2: 'Poziom A2 - CODZIENNE SYTUACJE',
+    B1: 'Poziom B1 - WYRAŻANIE OPINII',
+    B2: 'Poziom B2 - ABSTRAKCJA',
+    C1: 'Poziom C1 - SPECJALISTYCZNE',
+    C2: 'Poziom C2 - BIEGŁOŚĆ',
+  }
+
+  return `${levelDescriptions[level] || level}
+
+KATEGORIA DLA TEGO BATCHA: ${currentCategory}
+Skup się na słowach z tej kategorii!`
 }
 
 // Streaming endpoint z Server-Sent Events
@@ -143,24 +215,26 @@ export async function POST(
               stillNeeded,
             })
 
-            // Przykład istniejących słów żeby AI ich unikał
-            const existingSample = Array.from(existingSet).slice(0, 80).join(', ')
-            const excludeNote = existingSet.size > 0
-              ? `\n\nUNIKAJ tych słów (już istnieją): ${existingSample}...`
-              : ''
+            // WSZYSTKIE istniejące słowa - wysyłamy całą listę do AI
+            const allExistingWords = Array.from(existingSet).join(', ')
 
-            const prompt = `Wygeneruj listę ${batchSize} UNIKALNYCH słów w języku ${langName} dla poziomu ${level}.
+            const prompt = `Wygeneruj listę ${batchSize} NOWYCH słów w języku ${langName} dla poziomu ${level}.
 
-Zwróć JSON array:
-[{"word": "słowo", "translation": "tłumaczenie PL", "partOfSpeech": "noun/verb/adjective/adverb/other", "category": "kategoria", "example": "przykładowe zdanie"}]
+${getLevelGuidelines(level, batchAttempts)}
 
-${getLevelGuidelines(level)}
+KRYTYCZNE - LISTA ZABRONIONYCH SŁÓW (${existingSet.size} słów już w bazie):
+${allExistingWords}
+
+NIE GENERUJ ŻADNEGO SŁOWA Z POWYŻSZEJ LISTY! Każde słowo które wygenerujesz a które jest na liście zostanie odrzucone i zmarnujesz token.
 
 Zasady:
-- Czasowniki w bezokoliczniku, rzeczowniki w l.poj.
-- Każde słowo MUSI być unikalne${excludeNote}
+- Czasowniki w bezokoliczniku
+- Rzeczowniki w liczbie pojedynczej
+- TYLKO słowa których NIE MA na liście zabronionych
+- Skup się na kategorii podanej wyżej
 
-Zwróć TYLKO JSON array.`
+Zwróć TYLKO JSON array:
+[{"word": "słowo", "translation": "tłumaczenie PL", "partOfSpeech": "noun/verb/adjective/adverb/other", "category": "kategoria", "example": "przykładowe zdanie"}]`
 
             try {
               const result = await gemini.generateContent(prompt)
