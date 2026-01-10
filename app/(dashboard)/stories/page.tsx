@@ -198,6 +198,8 @@ export default function StoriesPage() {
   const [showLinkSetModal, setShowLinkSetModal] = useState(false)
   const [linkingSet, setLinkingSet] = useState(false)
   const [setToLink, setSetToLink] = useState('')
+  const [knownWords, setKnownWords] = useState<Set<string>>(new Set())
+  const [markingKnown, setMarkingKnown] = useState<string | null>(null)
 
   useEffect(() => {
     fetchStories()
@@ -599,6 +601,42 @@ export default function StoriesPage() {
     }
   }
 
+  // Oznacz słowo jako znane w bazie słownictwa
+  const markWordAsKnown = async (word: string) => {
+    if (!selectedStory || markingKnown) return
+
+    setMarkingKnown(word)
+    try {
+      const response = await fetch(`/api/vocabulary/${selectedStory.language}/mark-known`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word }),
+      })
+
+      if (response.ok) {
+        // Dodaj do lokalnej listy znanych słów
+        setKnownWords(prev => new Set([...prev, word.toLowerCase()]))
+
+        // Usuń słowo z targetWords w selectedStory (wizualnie)
+        setSelectedStory(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            targetWords: prev.targetWords?.filter(w => w.word.toLowerCase() !== word.toLowerCase())
+          }
+        })
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Nie udało się oznaczyć słowa')
+      }
+    } catch (error) {
+      console.error('Mark known error:', error)
+      alert('Błąd połączenia')
+    } finally {
+      setMarkingKnown(null)
+    }
+  }
+
   // Funkcja normalizująca słowa (z akcentami i bez) do porównania
   const normalizeForComparison = (word: string): string[] => {
     const lower = word.toLowerCase().replace(/[.,!?;:"""'']/g, '').trim()
@@ -992,24 +1030,44 @@ export default function StoriesPage() {
                   </h3>
                   <p className="text-xs text-gray-500 mb-3">
                     Te słowa zostały wybrane specjalnie dla Ciebie - najpierw podstawowe (A1), potem trudniejsze.
+                    Kliknij słowo aby dodać do fiszek, lub "✓" jeśli już je znasz.
                   </p>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {selectedStory.targetWords.map((item, index) => (
-                      <button
+                      <div
                         key={index}
-                        onClick={() => setWordModal(item)}
-                        className="text-left p-2 bg-emerald-50 rounded hover:bg-emerald-100 transition-colors border border-emerald-200 relative"
+                        className="flex items-stretch bg-emerald-50 rounded border border-emerald-200 overflow-hidden"
                       >
-                        {item.level && (
-                          <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded font-medium">
-                            {item.level}
-                          </span>
-                        )}
-                        <p className="font-medium text-gray-900 text-sm pr-8">
-                          {item.word}
-                        </p>
-                        <p className="text-emerald-600 text-xs">{item.translation}</p>
-                      </button>
+                        <button
+                          onClick={() => setWordModal(item)}
+                          className="flex-1 text-left p-2 hover:bg-emerald-100 transition-colors relative"
+                        >
+                          {item.level && (
+                            <span className="absolute top-1 right-1 text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-700 rounded font-medium">
+                              {item.level}
+                            </span>
+                          )}
+                          <p className="font-medium text-gray-900 text-sm pr-8">
+                            {item.word}
+                          </p>
+                          <p className="text-emerald-600 text-xs">{item.translation}</p>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            markWordAsKnown(item.word)
+                          }}
+                          disabled={markingKnown === item.word}
+                          className="px-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 border-l border-emerald-200 transition-colors flex items-center justify-center"
+                          title="Znam to słowo"
+                        >
+                          {markingKnown === item.word ? (
+                            <div className="w-4 h-4 border-2 border-emerald-400 rounded-full animate-spin border-t-transparent" />
+                          ) : (
+                            <span className="text-lg">✓</span>
+                          )}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>

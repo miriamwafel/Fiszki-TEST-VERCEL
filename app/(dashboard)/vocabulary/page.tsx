@@ -145,6 +145,44 @@ export default function VocabularyIndexPage() {
     }
   }
 
+  const generateLevelVocabulary = async (language: string, level: string) => {
+    if (generating || generatingFull) return
+
+    const cefrTargets: Record<string, number> = {
+      A1: 300, A2: 500, B1: 600, B2: 400, C1: 150, C2: 50
+    }
+
+    setGenerating(`${language}-${level}`)
+    toast.info(`Generuję ${languageNames[language]} poziom ${level} (~${cefrTargets[level]} słów)...`, {
+      duration: 60000,
+      description: 'Może potrwać 1-2 minuty.',
+    })
+
+    try {
+      const response = await fetch(`/api/vocabulary/${language}/generate-full`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ level }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const levelData = data.byLevel?.[level]
+        toast.success(`${languageNames[language]} ${level}: +${levelData?.created || data.totalCreated} słów`, {
+          description: levelData?.skipped ? `Pominięto ${levelData.skipped} duplikatów` : undefined,
+        })
+        await fetchLanguages()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Błąd generowania')
+      }
+    } catch {
+      toast.error('Błąd połączenia')
+    } finally {
+      setGenerating(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -176,12 +214,24 @@ export default function VocabularyIndexPage() {
             <span>⚙️</span> Panel admina - Wygeneruj bazę słownictwa
           </h2>
 
+          {/* Info o CEFR */}
+          <div className="mb-4 p-3 bg-white rounded-lg border border-purple-200 text-sm">
+            <p className="font-medium text-purple-900 mb-2">Rozkład CEFR (~2000 słów):</p>
+            <div className="grid grid-cols-6 gap-1 text-center text-xs">
+              <div className="bg-green-100 p-1 rounded"><span className="font-bold">A1</span><br/>300</div>
+              <div className="bg-green-200 p-1 rounded"><span className="font-bold">A2</span><br/>500</div>
+              <div className="bg-yellow-100 p-1 rounded"><span className="font-bold">B1</span><br/>600</div>
+              <div className="bg-yellow-200 p-1 rounded"><span className="font-bold">B2</span><br/>400</div>
+              <div className="bg-orange-100 p-1 rounded"><span className="font-bold">C1</span><br/>150</div>
+              <div className="bg-orange-200 p-1 rounded"><span className="font-bold">C2</span><br/>50</div>
+            </div>
+          </div>
+
           {/* Generowanie pełnej bazy */}
           <div className="mb-6">
-            <h3 className="font-semibold text-purple-800 mb-2">Generuj pełną bazę (~2000 słów)</h3>
+            <h3 className="font-semibold text-purple-800 mb-2">Generuj pełną bazę (wszystkie poziomy)</h3>
             <p className="text-sm text-purple-700 mb-3">
-              Wygeneruje ~333 słów dla każdego poziomu (A1, A2, B1, B2, C1, C2).
-              Trwa kilka minut - nie zamykaj strony.
+              Wygeneruje brakujące słowa dla wszystkich poziomów. Może trwać kilka minut.
             </p>
             <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
               {supportedLanguages.map(lang => (
@@ -213,41 +263,44 @@ export default function VocabularyIndexPage() {
             </div>
           </div>
 
-          {/* Szybkie generowanie dla pustych języków */}
-          {languagesEmpty.length > 0 && (
-            <div className="pt-4 border-t border-purple-200">
-              <h3 className="font-semibold text-purple-800 mb-2">Szybkie generowanie (200 słów A1)</h3>
-              <p className="text-sm text-purple-700 mb-3">
-                Szybsza opcja do testów - generuje tylko 200 słów poziomu A1.
-              </p>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                {languagesEmpty.map(lang => (
-                  <div key={lang} className="flex items-center gap-2 bg-white rounded-lg p-3 border border-purple-200">
-                    <span className="text-2xl">{languageFlags[lang]}</span>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{languageNames[lang]}</div>
-                      <div className="text-xs text-gray-500">Brak bazy</div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => generateVocabulary(lang, 'A1')}
-                      disabled={generating !== null || generatingFull !== null}
-                    >
-                      {generating === lang ? (
-                        <span className="flex items-center gap-1">
-                          <div className="w-3 h-3 border-2 border-gray-400 rounded-full animate-spin border-t-gray-600" />
-                          ...
-                        </span>
-                      ) : (
-                        'Szybki test'
-                      )}
-                    </Button>
+          {/* Generowanie poziom po poziomie */}
+          <div className="pt-4 border-t border-purple-200">
+            <h3 className="font-semibold text-purple-800 mb-2">Generowanie poziom po poziomie</h3>
+            <p className="text-sm text-purple-700 mb-3">
+              Szybsza opcja - generuj jeden poziom na raz (polecane dla stabilności).
+            </p>
+            <div className="space-y-3">
+              {supportedLanguages.map(lang => (
+                <div key={`level-${lang}`} className="bg-white rounded-lg p-3 border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">{languageFlags[lang]}</span>
+                    <span className="font-medium text-gray-900">{languageNames[lang]}</span>
+                    <span className="text-xs text-gray-500">({languages.find(l => l.language === lang)?.total || 0} słów)</span>
                   </div>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-2">
+                    {['A1', 'A2', 'B1', 'B2', 'C1', 'C2'].map(level => (
+                      <Button
+                        key={level}
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => generateLevelVocabulary(lang, level)}
+                        disabled={generating !== null || generatingFull !== null}
+                        className="text-xs px-2 py-1"
+                      >
+                        {generating === `${lang}-${level}` ? (
+                          <span className="flex items-center gap-1">
+                            <div className="w-3 h-3 border-2 border-gray-400 rounded-full animate-spin border-t-gray-600" />
+                          </span>
+                        ) : (
+                          level
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
         </Card>
       )}
 

@@ -4,11 +4,39 @@ import { authOptions } from '@/lib/auth'
 import prisma from '@/lib/db'
 import { gemini } from '@/lib/gemini'
 
-// Liczba słów per poziom (6 poziomów x 333 = ~2000 słów)
-const WORDS_PER_LEVEL = 333
-const BATCH_SIZE = 100 // AI generuje max 100 słów na raz
+/**
+ * Rozkład słów według CEFR (Common European Framework of Reference)
+ *
+ * A1: 300 słów - podstawowe przetrwanie (powitania, liczby, kolory, rodzina, jedzenie)
+ * A2: 500 słów - codzienne sytuacje (zakupy, podróże, praca, hobby)
+ * B1: 600 słów - wyrażanie opinii, uczuć, doświadczeń, planów
+ * B2: 400 słów - abstrakcyjne tematy, idiomy, argumentacja
+ * C1: 150 słów - specjalistyczne, formalne, niuanse
+ * C2: 50 słów - rzadkie, literackie, subtelne różnice
+ *
+ * Razem: ~2000 słów z naciskiem na podstawy
+ */
+const CEFR_DISTRIBUTION: Record<string, number> = {
+  A1: 300,
+  A2: 500,
+  B1: 600,
+  B2: 400,
+  C1: 150,
+  C2: 50,
+}
 
-// POST - Wygeneruj pełną bazę słownictwa dla języka (wszystkie poziomy)
+const BATCH_SIZE = 80 // AI generuje max ~80-100 słów na raz (bezpieczniej 80)
+
+const languageNames: Record<string, string> = {
+  en: 'angielski',
+  de: 'niemiecki',
+  es: 'hiszpański',
+  fr: 'francuski',
+  it: 'włoski',
+}
+
+// POST - Wygeneruj bazę słownictwa dla języka
+// Body: { level?: string } - opcjonalnie tylko jeden poziom
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ language: string }> }
@@ -30,67 +58,93 @@ export async function POST(
       return NextResponse.json({ error: 'Admin only' }, { status: 403 })
     }
 
-    const languageNames: Record<string, string> = {
-      en: 'angielski',
-      de: 'niemiecki',
-      es: 'hiszpański',
-      fr: 'francuski',
-      it: 'włoski',
+    // Opcjonalnie: generuj tylko jeden poziom
+    let targetLevel: string | null = null
+    try {
+      const body = await request.json()
+      targetLevel = body?.level || null
+    } catch {
+      // Brak body = generuj wszystkie poziomy
     }
 
     const langName = languageNames[language] || language
-    const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
+    const levels = targetLevel
+      ? [targetLevel.toUpperCase()]
+      : ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
 
     const results = {
       totalCreated: 0,
       totalSkipped: 0,
-      byLevel: {} as Record<string, { created: number; skipped: number }>,
+      byLevel: {} as Record<string, { created: number; skipped: number; target: number }>,
     }
 
-    let globalRank = 1
+    // Znajdź najwyższy rank w bazie
+    const maxRankRecord = await prisma.vocabularyBase.findFirst({
+      where: { language },
+      orderBy: { frequencyRank: 'desc' },
+      select: { frequencyRank: true },
+    })
+    let globalRank = (maxRankRecord?.frequencyRank || 0) + 1
 
     for (const level of levels) {
-      results.byLevel[level] = { created: 0, skipped: 0 }
+      const targetCount = CEFR_DISTRIBUTION[level] || 100
+      results.byLevel[level] = { created: 0, skipped: 0, target: targetCount }
 
-      // Ile batch'y potrzebujemy dla tego poziomu
-      const batches = Math.ceil(WORDS_PER_LEVEL / BATCH_SIZE)
+      // Sprawdź ile słów już mamy dla tego poziomu
+      const existingCount = await prisma.vocabularyBase.count({
+        where: { language, level },
+      })
+
+      // Ile jeszcze potrzebujemy
+      const neededCount = Math.max(0, targetCount - existingCount)
+      if (neededCount === 0) {
+        console.log(`Level ${level}: already has ${existingCount} words (target: ${targetCount})`)
+        continue
+      }
+
+      console.log(`Level ${level}: need ${neededCount} more words (have ${existingCount}, target: ${targetCount})`)
+
+      // Ile batch'y potrzebujemy
+      const batches = Math.ceil(neededCount / BATCH_SIZE)
 
       for (let batch = 0; batch < batches; batch++) {
-        const batchSize = Math.min(BATCH_SIZE, WORDS_PER_LEVEL - batch * BATCH_SIZE)
-        const batchOffset = batch * BATCH_SIZE
+        const batchSize = Math.min(BATCH_SIZE, neededCount - batch * BATCH_SIZE)
+        if (batchSize <= 0) break
 
         // Pobierz już istniejące słowa dla tego języka żeby ich nie powtarzać
         const existingWords = await prisma.vocabularyBase.findMany({
           where: { language },
           select: { word: true },
         })
-        const existingSet = new Set(existingWords.map(w => w.word.toLowerCase()))
+        const existingSet = new Set(existingWords.map((w: { word: string }) => w.word.toLowerCase()))
 
         const prompt = `Wygeneruj listę ${batchSize} słów w języku ${langName} dla poziomu ${level}.
 
-${batchOffset > 0 ? `To jest część ${batch + 1} - wygeneruj INNE słowa niż w poprzednich częściach.` : ''}
+${batch > 0 ? `To jest część ${batch + 1} - wygeneruj INNE słowa niż wcześniej.` : ''}
 
-Zwróć JSON array z obiektami w formacie:
+Zwróć JSON array z obiektami:
 [
   {
-    "word": "słowo w języku obcym (forma podstawowa/bezokolicznik)",
+    "word": "słowo (forma podstawowa/bezokolicznik)",
     "translation": "polskie tłumaczenie",
-    "partOfSpeech": "noun/verb/adjective/adverb/preposition/conjunction/pronoun/article/other",
-    "category": "kategoria tematyczna (np. food, travel, work, family, emotions, time, numbers, colors, body, health, education, shopping, nature, weather, house, transport, communication, entertainment, sport, music, art, technology, science, politics, business, law, medicine, religion, environment)",
-    "example": "krótkie przykładowe zdanie z użyciem słowa"
+    "partOfSpeech": "noun/verb/adjective/adverb/preposition/conjunction/pronoun/other",
+    "category": "kategoria (food, travel, work, family, emotions, time, body, health, education, shopping, nature, house, transport, communication, entertainment, sport, technology)",
+    "example": "krótkie przykładowe zdanie"
   }
 ]
 
-Ważne:
-- Poziom ${level} oznacza: ${getLevelDescription(level)}
-- Dla czasowników użyj bezokolicznika
-- Dla rzeczowników użyj formy podstawowej (liczba pojedyncza)
-- Słowa powinny być posortowane od najczęściej używanych do rzadziej używanych dla danego poziomu
-- Tłumaczenia mają być po polsku
-- Przykłady powinny być proste i naturalne dla poziomu ${level}
-- WAŻNE: Wygeneruj unikalne słowa, nie powtarzaj się
+WAŻNE dla poziomu ${level}:
+${getLevelGuidelines(level)}
 
-Zwróć TYLKO JSON array, bez żadnego dodatkowego tekstu.`
+Zasady:
+- Czasowniki w bezokoliczniku
+- Rzeczowniki w liczbie pojedynczej
+- Sortuj od najczęściej używanych
+- Tłumaczenia po polsku
+- NIE powtarzaj słów
+- Przykłady naturalne dla poziomu ${level}
+
+Zwróć TYLKO JSON array.`
 
         try {
           const result = await gemini.generateContent(prompt)
@@ -108,7 +162,7 @@ Zwróć TYLKO JSON array, bez żadnego dodatkowego tekstu.`
             const jsonStr = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
             words = JSON.parse(jsonStr)
           } catch {
-            console.error(`Failed to parse AI response for ${level} batch ${batch}:`, responseText.substring(0, 200))
+            console.error(`Failed to parse AI response for ${level} batch ${batch}`)
             continue
           }
 
@@ -145,8 +199,8 @@ Zwróć TYLKO JSON array, bez żadnego dodatkowego tekstu.`
             }
           }
 
-          // Mały delay między requestami żeby nie przekroczyć rate limit
-          await new Promise(resolve => setTimeout(resolve, 1000))
+          // Delay między requestami (rate limiting)
+          await new Promise(resolve => setTimeout(resolve, 1500))
 
         } catch (error) {
           console.error(`Error generating batch ${batch} for level ${level}:`, error)
@@ -159,19 +213,69 @@ Zwróć TYLKO JSON array, bez żadnego dodatkowego tekstu.`
       ...results,
     })
   } catch (error) {
-    console.error('Generate full vocabulary error:', error)
+    console.error('Generate vocabulary error:', error)
     return NextResponse.json({ error: 'Wystąpił błąd' }, { status: 500 })
   }
 }
 
-function getLevelDescription(level: string): string {
-  const descriptions: Record<string, string> = {
-    A1: 'podstawowe słowa codziennego użytku - powitania, liczby, kolory, rodzina, jedzenie, dni tygodnia',
-    A2: 'proste słowa do opisywania codziennych sytuacji - zakupy, podróże, praca, hobby',
-    B1: 'słowa do wyrażania opinii, uczuć, opisywania doświadczeń i planów',
-    B2: 'słowa abstrakcyjne, idiomy, wyrażenia do dyskusji i argumentacji',
-    C1: 'zaawansowane słownictwo specjalistyczne, niuanse językowe, wyrażenia formalne',
-    C2: 'rzadkie słowa, wyrażenia literackie, specjalistyczne terminy, subtelne różnice znaczeniowe',
+function getLevelGuidelines(level: string): string {
+  const guidelines: Record<string, string> = {
+    A1: `Poziom A1 (300 słów) - PODSTAWOWE PRZETRWANIE:
+- Powitania i pożegnania (hola, adiós, buenos días)
+- Liczby 1-100
+- Kolory podstawowe
+- Rodzina (mama, tata, brat, siostra)
+- Jedzenie podstawowe (chleb, woda, mleko, jabłko)
+- Dni tygodnia, miesiące
+- Zaimki (ja, ty, on, ona)
+- Czasowniki: być, mieć, chcieć, móc, robić, iść
+- Przymiotniki: duży, mały, dobry, zły, ładny
+- Przedmioty codzienne (dom, stół, krzesło)`,
+
+    A2: `Poziom A2 (500 słów) - CODZIENNE SYTUACJE:
+- Zakupy (sklep, cena, pieniądze, tani, drogi)
+- Podróże (bilet, hotel, lotnisko, pociąg)
+- Praca (biuro, szef, kolega, spotkanie)
+- Hobby i czas wolny (film, muzyka, sport)
+- Pogoda (słońce, deszcz, zimno, ciepło)
+- Zdrowie podstawowe (lekarz, ból, chory)
+- Emocje proste (szczęśliwy, smutny, zmęczony)
+- Więcej czasowników: kupować, sprzedawać, pracować, grać`,
+
+    B1: `Poziom B1 (600 słów) - WYRAŻANIE OPINII:
+- Opinie (myślę że, uważam, zgadzam się)
+- Uczucia złożone (rozczarowany, podekscytowany, zaskoczony)
+- Doświadczenia (pamiętać, zapomnieć, doświadczyć)
+- Plany i marzenia (planować, marzyć, zamierzać)
+- Edukacja (uniwersytet, egzamin, kurs)
+- Technologia (komputer, internet, aplikacja)
+- Relacje (przyjaciel, znajomy, partner)
+- Spójniki złożone (chociaż, podczas gdy, ponieważ)`,
+
+    B2: `Poziom B2 (400 słów) - ABSTRAKCJA I ARGUMENTACJA:
+- Idiomy i wyrażenia potoczne
+- Słowa abstrakcyjne (wolność, sprawiedliwość, odpowiedzialność)
+- Dyskusja (argument, dowód, wniosek)
+- Polityka i społeczeństwo
+- Ekonomia podstawowa
+- Środowisko
+- Synonimy i antonimy zaawansowane
+- Czasowniki złożone (phrasal verbs)`,
+
+    C1: `Poziom C1 (150 słów) - SPECJALISTYCZNE:
+- Słownictwo formalne i akademickie
+- Niuanse znaczeniowe
+- Wyrażenia idiomatyczne zaawansowane
+- Terminy prawne i biznesowe
+- Stylistyka i rejestry języka
+- Kolokacje zaawansowane`,
+
+    C2: `Poziom C2 (50 słów) - BIEGŁOŚĆ:
+- Słowa rzadkie i literackie
+- Archaizmy używane w formalnym języku
+- Subtelne różnice znaczeniowe
+- Specjalistyczne terminy naukowe
+- Wyrażenia o wysokim rejestrze`,
   }
-  return descriptions[level] || level
+  return guidelines[level] || level
 }
