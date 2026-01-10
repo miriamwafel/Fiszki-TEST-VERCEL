@@ -88,7 +88,8 @@ function getLevelGuidelines(level: string, batchNum: number): string {
   }
 
   const categories = categoryRotation[level] || categoryRotation['A2']
-  const categoryIndex = (batchNum - 1) % categories.length
+  // Losowa kategoria - żeby nie było przewagi żadnej kategorii
+  const categoryIndex = Math.floor(Math.random() * categories.length)
   const currentCategory = categories[categoryIndex]
 
   const levelDescriptions: Record<string, string> = {
