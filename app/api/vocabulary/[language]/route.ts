@@ -40,6 +40,7 @@ export async function GET(
             id: true,
             status: true,
             source: true,
+            sourceId: true,
             learnedAt: true,
           },
         },
@@ -49,13 +50,47 @@ export async function GET(
       skip: offset,
     })
 
+    // Pobierz informacje o fiszkach dla słów z source = 'flashcard'
+    const flashcardIds = vocabulary
+      .filter(v => v.userProgress[0]?.source === 'flashcard' && v.userProgress[0]?.sourceId)
+      .map(v => v.userProgress[0]!.sourceId!)
+
+    const flashcards = flashcardIds.length > 0
+      ? await prisma.flashcard.findMany({
+          where: { id: { in: flashcardIds } },
+          select: {
+            id: true,
+            word: true,
+            set: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        })
+      : []
+
+    const flashcardMap = new Map(flashcards.map(f => [f.id, f]))
+
     // Filtruj po statusie jeśli podano
-    let filteredVocabulary = vocabulary.map(v => ({
-      ...v,
-      userStatus: v.userProgress[0]?.status || 'unknown',
-      userSource: v.userProgress[0]?.source || null,
-      learnedAt: v.userProgress[0]?.learnedAt || null,
-    }))
+    let filteredVocabulary = vocabulary.map(v => {
+      const progress = v.userProgress[0]
+      const flashcard = progress?.sourceId ? flashcardMap.get(progress.sourceId) : null
+
+      return {
+        ...v,
+        userStatus: progress?.status || 'unknown',
+        userSource: progress?.source || null,
+        sourceId: progress?.sourceId || null,
+        sourceInfo: flashcard ? {
+          setId: flashcard.set.id,
+          setName: flashcard.set.name,
+          flashcardWord: flashcard.word,
+        } : null,
+        learnedAt: progress?.learnedAt || null,
+      }
+    })
 
     if (status) {
       filteredVocabulary = filteredVocabulary.filter(v => v.userStatus === status)

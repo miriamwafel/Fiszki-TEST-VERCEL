@@ -17,6 +17,11 @@ interface VocabularyWord {
   example: string | null
   userStatus: 'unknown' | 'learning' | 'known'
   userSource: string | null
+  sourceInfo: {
+    setId: string
+    setName: string
+    flashcardWord: string
+  } | null
 }
 
 interface Stats {
@@ -356,7 +361,22 @@ export default function VocabularyPage({ params }: { params: Promise<{ language:
                   )}
                   {word.userSource && (
                     <div className="text-xs text-gray-400 mt-1">
-                      Źródło: {word.userSource === 'flashcard' ? 'fiszka' : word.userSource === 'story' ? 'historia' : 'ręcznie'}
+                      {word.userSource === 'flashcard' && word.sourceInfo ? (
+                        <span>
+                          Fiszka z zestawu:{' '}
+                          <Link
+                            href={`/sets/${word.sourceInfo.setId}`}
+                            className="text-primary-600 hover:text-primary-700 hover:underline font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {word.sourceInfo.setName}
+                          </Link>
+                        </span>
+                      ) : word.userSource === 'story' ? (
+                        'Źródło: historia'
+                      ) : (
+                        'Oznaczone ręcznie'
+                      )}
                     </div>
                   )}
                 </div>
