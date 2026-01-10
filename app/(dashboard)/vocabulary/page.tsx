@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Card } from '@/components/Card'
 import { Button } from '@/components/Button'
@@ -12,6 +12,19 @@ interface LanguageStats {
   unknown: number
   learning: number
   known: number
+}
+
+interface GenerationProgress {
+  status: 'idle' | 'running' | 'complete' | 'error'
+  currentLevel: string | null
+  currentBatch: number
+  totalCreated: number
+  totalSkipped: number
+  stillNeeded: number
+  targetCount: number
+  recentWords: string[]
+  logs: string[]
+  error?: string
 }
 
 const languageNames: Record<string, string> = {
@@ -42,6 +55,18 @@ const DEFAULT_CEFR_TARGETS: Record<string, number> = {
   C2: 50,
 }
 
+const initialProgress: GenerationProgress = {
+  status: 'idle',
+  currentLevel: null,
+  currentBatch: 0,
+  totalCreated: 0,
+  totalSkipped: 0,
+  stillNeeded: 0,
+  targetCount: 0,
+  recentWords: [],
+  logs: [],
+}
+
 export default function VocabularyIndexPage() {
   const [languages, setLanguages] = useState<LanguageStats[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,6 +75,9 @@ export default function VocabularyIndexPage() {
   const [generatingFull, setGeneratingFull] = useState<string | null>(null)
   const [cefrTargets, setCefrTargets] = useState<Record<string, number>>(DEFAULT_CEFR_TARGETS)
   const [editingCefr, setEditingCefr] = useState(false)
+  const [progress, setProgress] = useState<GenerationProgress>(initialProgress)
+  const [showProgressModal, setShowProgressModal] = useState(false)
+  const logsEndRef = useRef<HTMLDivElement>(null)
 
   const fetchLanguages = async () => {
     try {
@@ -144,34 +172,118 @@ export default function VocabularyIndexPage() {
     if (generatingFull) return
 
     setGeneratingFull(language)
-    toast.info(`Generuję pełną bazę słów ${languageNames[language]} (~2000 słów, wszystkie poziomy)...`, {
-      duration: 120000, // 2 minuty
-      description: 'To może potrwać kilka minut. Nie zamykaj strony.',
-    })
+    setProgress({ ...initialProgress, status: 'running', targetCount: Object.values(cefrTargets).reduce((a, b) => a + b, 0) })
+    setShowProgressModal(true)
+
+    const addLog = (msg: string) => {
+      setProgress(prev => ({
+        ...prev,
+        logs: [...prev.logs.slice(-50), `[${new Date().toLocaleTimeString()}] ${msg}`]
+      }))
+    }
 
     try {
-      const response = await fetch(`/api/vocabulary/${language}/generate-full`, {
+      addLog(`Rozpoczynam pełne generowanie ${languageNames[language]} (wszystkie poziomy)...`)
+
+      const response = await fetch(`/api/vocabulary/${language}/generate-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        toast.success(`Wygenerowano ${data.totalCreated} słów dla ${languageNames[language]}!`, {
-          description: `Pominięto ${data.totalSkipped} duplikatów`,
-        })
-        // Odśwież listę
-        await fetchLanguages()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Błąd generowania')
+      if (!response.ok) {
+        throw new Error('Błąd połączenia z serwerem')
       }
-    } catch {
-      toast.error('Błąd połączenia')
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('Brak strumienia odpowiedzi')
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n').filter(line => line.startsWith('data: '))
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6))
+
+            switch (data.type) {
+              case 'start':
+                addLog(data.message)
+                break
+              case 'info':
+                addLog(data.message)
+                break
+              case 'level_start':
+                setProgress(prev => ({
+                  ...prev,
+                  currentLevel: data.level,
+                  stillNeeded: data.needed,
+                }))
+                addLog(`${data.level}: mam ${data.existing}/${data.target}, potrzebuję ${data.needed} nowych`)
+                break
+              case 'batch_start':
+                setProgress(prev => ({ ...prev, currentBatch: data.batch }))
+                addLog(`${data.level} batch ${data.batch}: proszę AI o ${data.requesting} słów...`)
+                break
+              case 'batch_complete':
+                setProgress(prev => ({
+                  ...prev,
+                  totalCreated: data.totalCreated,
+                  stillNeeded: data.stillNeeded,
+                  recentWords: [...data.words, ...prev.recentWords].slice(0, 20),
+                }))
+                addLog(`${data.level} batch ${data.batch}: +${data.added} słów`)
+                break
+              case 'batch_error':
+                addLog(`BŁĄD batch ${data.batch}: ${data.error}`)
+                break
+              case 'level_complete':
+                addLog(`${data.level} GOTOWE: ${data.total}/${data.target} słów (+${data.created} nowych)`)
+                break
+              case 'complete':
+                setProgress(prev => ({
+                  ...prev,
+                  status: 'complete',
+                  totalCreated: data.totalCreated,
+                  totalSkipped: data.totalSkipped,
+                }))
+                addLog(data.message)
+                toast.success(`${languageNames[language]}: +${data.totalCreated} słów`)
+                break
+              case 'error':
+                setProgress(prev => ({ ...prev, status: 'error', error: data.error }))
+                addLog(`BŁĄD: ${data.error}`)
+                toast.error(data.error)
+                break
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      await fetchLanguages()
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Nieznany błąd'
+      setProgress(prev => ({ ...prev, status: 'error', error: errorMsg }))
+      toast.error(errorMsg)
     } finally {
       setGeneratingFull(null)
     }
   }
+
+  // Scroll logs to bottom when new log appears
+  useEffect(() => {
+    if (logsEndRef.current) {
+      logsEndRef.current.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [progress.logs])
 
   const generateLevelVocabulary = async (language: string, level: string) => {
     if (generating || generatingFull) return
@@ -179,31 +291,109 @@ export default function VocabularyIndexPage() {
     const targetCount = cefrTargets[level] || 100
 
     setGenerating(`${language}-${level}`)
-    toast.info(`Generuję ${languageNames[language]} poziom ${level} (do ${targetCount} słów)...`, {
-      duration: 60000,
-      description: 'Uzupełnia brakujące słowa. Może potrwać 1-2 minuty.',
-    })
+    setProgress({ ...initialProgress, status: 'running', targetCount })
+    setShowProgressModal(true)
+
+    const addLog = (msg: string) => {
+      setProgress(prev => ({
+        ...prev,
+        logs: [...prev.logs.slice(-50), `[${new Date().toLocaleTimeString()}] ${msg}`]
+      }))
+    }
 
     try {
-      const response = await fetch(`/api/vocabulary/${language}/generate-full`, {
+      addLog(`Rozpoczynam generowanie ${languageNames[language]} ${level}...`)
+
+      const response = await fetch(`/api/vocabulary/${language}/generate-stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ level, targetCount }),
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        const levelData = data.byLevel?.[level]
-        toast.success(`${languageNames[language]} ${level}: +${levelData?.created || data.totalCreated} słów`, {
-          description: levelData?.skipped ? `Pominięto ${levelData.skipped} duplikatów` : undefined,
-        })
-        await fetchLanguages()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Błąd generowania')
+      if (!response.ok) {
+        throw new Error('Błąd połączenia z serwerem')
       }
-    } catch {
-      toast.error('Błąd połączenia')
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('Brak strumienia odpowiedzi')
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunk = decoder.decode(value)
+        const lines = chunk.split('\n').filter(line => line.startsWith('data: '))
+
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line.slice(6))
+
+            switch (data.type) {
+              case 'start':
+                addLog(data.message)
+                break
+              case 'info':
+                addLog(data.message)
+                break
+              case 'level_start':
+                setProgress(prev => ({
+                  ...prev,
+                  currentLevel: data.level,
+                  stillNeeded: data.needed,
+                  targetCount: data.target,
+                }))
+                addLog(`${data.level}: mam ${data.existing}/${data.target}, potrzebuję ${data.needed} nowych`)
+                break
+              case 'batch_start':
+                setProgress(prev => ({ ...prev, currentBatch: data.batch }))
+                addLog(`${data.level} batch ${data.batch}: proszę AI o ${data.requesting} słów...`)
+                break
+              case 'batch_complete':
+                setProgress(prev => ({
+                  ...prev,
+                  totalCreated: data.totalCreated,
+                  stillNeeded: data.stillNeeded,
+                  recentWords: [...data.words, ...prev.recentWords].slice(0, 20),
+                }))
+                addLog(`${data.level} batch ${data.batch}: +${data.added} słów (${data.words.slice(0, 5).join(', ')}${data.words.length > 5 ? '...' : ''})`)
+                break
+              case 'batch_error':
+                addLog(`BŁĄD batch ${data.batch}: ${data.error}`)
+                break
+              case 'level_complete':
+                addLog(`${data.level} GOTOWE: ${data.total}/${data.target} słów (+${data.created} nowych)`)
+                break
+              case 'complete':
+                setProgress(prev => ({
+                  ...prev,
+                  status: 'complete',
+                  totalCreated: data.totalCreated,
+                  totalSkipped: data.totalSkipped,
+                }))
+                addLog(data.message)
+                toast.success(`${languageNames[language]} ${level}: +${data.totalCreated} słów`)
+                break
+              case 'error':
+                setProgress(prev => ({ ...prev, status: 'error', error: data.error }))
+                addLog(`BŁĄD: ${data.error}`)
+                toast.error(data.error)
+                break
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+      }
+
+      await fetchLanguages()
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Nieznany błąd'
+      setProgress(prev => ({ ...prev, status: 'error', error: errorMsg }))
+      toast.error(errorMsg)
     } finally {
       setGenerating(null)
     }
@@ -405,7 +595,7 @@ export default function VocabularyIndexPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {languagesWithData.map((lang) => {
-            const progress = lang.total > 0
+            const langProgress = lang.total > 0
               ? Math.round(((lang.known + lang.learning) / lang.total) * 100)
               : 0
 
@@ -430,7 +620,7 @@ export default function VocabularyIndexPage() {
                   <div className="mb-3">
                     <div className="flex justify-between text-sm text-gray-600 mb-1">
                       <span>Postęp</span>
-                      <span>{progress}%</span>
+                      <span>{langProgress}%</span>
                     </div>
                     <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
                       <div className="h-full flex">
@@ -479,6 +669,152 @@ export default function VocabularyIndexPage() {
           <li>• Nie musisz wybierać poziomu słów - system sam wie jakie słowa powinieneś znać!</li>
         </ul>
       </div>
+
+      {/* Progress Modal */}
+      {showProgressModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                {progress.status === 'running' && (
+                  <div className="w-5 h-5 border-3 border-purple-200 rounded-full animate-spin border-t-purple-600" />
+                )}
+                {progress.status === 'complete' && <span className="text-green-500">✓</span>}
+                {progress.status === 'error' && <span className="text-red-500">✕</span>}
+                Generowanie słownictwa
+              </h2>
+              {progress.status !== 'running' && (
+                <button
+                  onClick={() => {
+                    setShowProgressModal(false)
+                    setProgress(initialProgress)
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Stats */}
+            <div className="p-4 bg-gray-50 border-b">
+              <div className="grid grid-cols-4 gap-3 text-center text-sm">
+                <div className="bg-white rounded-lg p-2 border">
+                  <div className="text-2xl font-bold text-purple-600">{progress.totalCreated}</div>
+                  <div className="text-gray-500 text-xs">dodano</div>
+                </div>
+                <div className="bg-white rounded-lg p-2 border">
+                  <div className="text-2xl font-bold text-gray-600">{progress.stillNeeded}</div>
+                  <div className="text-gray-500 text-xs">pozostało</div>
+                </div>
+                <div className="bg-white rounded-lg p-2 border">
+                  <div className="text-2xl font-bold text-amber-600">{progress.totalSkipped}</div>
+                  <div className="text-gray-500 text-xs">pominięto</div>
+                </div>
+                <div className="bg-white rounded-lg p-2 border">
+                  <div className="text-lg font-bold text-blue-600">{progress.currentLevel || '-'}</div>
+                  <div className="text-gray-500 text-xs">poziom</div>
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              {progress.targetCount > 0 && (
+                <div className="mt-3">
+                  <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <span>Postęp</span>
+                    <span>{progress.totalCreated}/{progress.targetCount - progress.stillNeeded + progress.totalCreated}</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-purple-500 to-purple-600 transition-all duration-300"
+                      style={{
+                        width: `${Math.min(100, (progress.totalCreated / Math.max(1, progress.targetCount - progress.stillNeeded + progress.totalCreated)) * 100)}%`
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Recent words */}
+            {progress.recentWords.length > 0 && (
+              <div className="p-3 bg-green-50 border-b">
+                <div className="text-xs text-green-700 font-medium mb-1">Ostatnio dodane:</div>
+                <div className="flex flex-wrap gap-1">
+                  {progress.recentWords.slice(0, 15).map((word, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-green-100 text-green-800 rounded text-xs">
+                      {word}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Logs */}
+            <div className="flex-1 overflow-auto p-3 bg-gray-900 text-gray-100 font-mono text-xs min-h-[200px] max-h-[300px]">
+              {progress.logs.length === 0 ? (
+                <div className="text-gray-500">Oczekiwanie na logi...</div>
+              ) : (
+                progress.logs.map((log, i) => (
+                  <div key={i} className={`py-0.5 ${
+                    log.includes('BŁĄD') ? 'text-red-400' :
+                    log.includes('GOTOWE') ? 'text-green-400' :
+                    log.includes('Zakończono') ? 'text-green-400 font-bold' :
+                    log.includes('batch') && log.includes('+') ? 'text-purple-400' :
+                    'text-gray-300'
+                  }`}>
+                    {log}
+                  </div>
+                ))
+              )}
+              <div ref={logsEndRef} />
+            </div>
+
+            {/* Footer */}
+            {progress.status === 'complete' && (
+              <div className="p-4 bg-green-50 border-t text-center">
+                <div className="text-green-700 font-medium">
+                  Generowanie zakończone pomyślnie!
+                </div>
+                <Button
+                  onClick={() => {
+                    setShowProgressModal(false)
+                    setProgress(initialProgress)
+                  }}
+                  className="mt-2"
+                >
+                  Zamknij
+                </Button>
+              </div>
+            )}
+
+            {progress.status === 'error' && (
+              <div className="p-4 bg-red-50 border-t text-center">
+                <div className="text-red-700 font-medium">
+                  Wystąpił błąd: {progress.error}
+                </div>
+                <Button
+                  onClick={() => {
+                    setShowProgressModal(false)
+                    setProgress(initialProgress)
+                  }}
+                  variant="secondary"
+                  className="mt-2"
+                >
+                  Zamknij
+                </Button>
+              </div>
+            )}
+
+            {progress.status === 'running' && (
+              <div className="p-3 bg-purple-50 border-t text-center text-sm text-purple-700">
+                Trwa generowanie... Nie zamykaj tej strony.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
