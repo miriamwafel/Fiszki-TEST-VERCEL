@@ -33,8 +33,7 @@ interface PracticeViewProps {
   flashcards: Flashcard[]
 }
 
-const BATCH_SIZE = 7 // Ile słówek dokładamy na raz
-const THRESHOLD = 2 // Gdy zostanie tyle lub mniej nieopanowanych, dokładamy nowe
+const BATCH_SIZE = 6 // Rozmiar partii jak w Quizlet
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
@@ -45,17 +44,23 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled
 }
 
+function splitIntoBatches<T>(array: T[], batchSize: number): T[][] {
+  const batches: T[][] = []
+  for (let i = 0; i < array.length; i += batchSize) {
+    batches.push(array.slice(i, i + batchSize))
+  }
+  return batches
+}
+
 export function PracticeView({ set, flashcards: initialFlashcards }: PracticeViewProps) {
-  // Słówka czekające na dodanie
-  const [waitingQueue, setWaitingQueue] = useState<Flashcard[]>([])
+  // Partie słówek
+  const [allBatches, setAllBatches] = useState<Flashcard[][]>([])
+  const [currentBatchIndex, setCurrentBatchIndex] = useState(0)
 
-  // Aktywne słówka (w grze)
-  const [activeCards, setActiveCards] = useState<Flashcard[]>([])
-  const [masteredIds, setMasteredIds] = useState<Set<string>>(new Set())
-
-  // Aktualna runda
+  // Aktualna runda w partii
   const [currentRound, setCurrentRound] = useState<Flashcard[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [masteredInBatch, setMasteredInBatch] = useState<Set<string>>(new Set())
 
   // Stan UI
   const [answer, setAnswer] = useState('')
@@ -69,30 +74,34 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   const [correctionDone, setCorrectionDone] = useState(false)
   const [userAnswer, setUserAnswer] = useState('')
 
-  // Inicjalizacja
+  // Inicjalizacja partii
   useEffect(() => {
     const notMastered = initialFlashcards.filter((f) => !f.stats?.mastered)
     const toUse = notMastered.length > 0 ? notMastered : initialFlashcards
+
     const shuffled = shuffleArray(toUse)
+    const batches = splitIntoBatches(shuffled, BATCH_SIZE)
 
-    // Weź pierwszą partię jako aktywne
-    const firstBatch = shuffled.slice(0, BATCH_SIZE)
-    const remaining = shuffled.slice(BATCH_SIZE)
-
-    setActiveCards(firstBatch)
-    setWaitingQueue(remaining)
-    setCurrentRound(firstBatch)
+    setAllBatches(batches)
+    setCurrentBatchIndex(0)
+    setCurrentRound(batches[0] || [])
     setCurrentIndex(0)
-    setMasteredIds(new Set())
+    setMasteredInBatch(new Set())
     setCompleted(false)
     setStats({ correct: 0, incorrect: 0 })
   }, [initialFlashcards])
 
+  const currentBatch = allBatches[currentBatchIndex] || []
   const currentCard = currentRound[currentIndex]
+  const totalBatches = allBatches.length
 
-  // Statystyki
-  const totalCards = initialFlashcards.filter((f) => !f.stats?.mastered).length || initialFlashcards.length
-  const notMasteredCount = activeCards.filter(c => !masteredIds.has(c.id)).length
+  // Ile słówek opanowanych w aktualnej partii
+  const batchProgress = useMemo(() => {
+    return {
+      total: currentBatch.length,
+      mastered: masteredInBatch.size,
+    }
+  }, [currentBatch.length, masteredInBatch.size])
 
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -124,8 +133,10 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     }))
 
     if (correct) {
-      setMasteredIds((prev) => new Set(prev).add(currentCard.id))
+      // Oznacz jako opanowane w tej partii
+      setMasteredInBatch((prev) => new Set(prev).add(currentCard.id))
     } else {
+      // Włącz tryb korekcji
       setCorrectionMode(true)
       setUserAnswer(answer)
       setAnswer('')
@@ -157,41 +168,28 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
       // Następne słówko w rundzie
       setCurrentIndex((prev) => prev + 1)
     } else {
-      // Koniec rundy - sprawdź ile nieopanowanych zostało
-      const notMasteredInActive = activeCards.filter(
-        (card) => !masteredIds.has(card.id)
+      // Koniec rundy - sprawdź czy są słówka do powtórki w tej partii
+      const notMasteredInBatch = currentBatch.filter(
+        (card) => !masteredInBatch.has(card.id)
       )
 
-      if (notMasteredInActive.length === 0 && waitingQueue.length === 0) {
-        // Wszystko opanowane!
-        setCompleted(true)
-        return
-      }
-
-      // Czy dokładamy nowe słówka?
-      if (notMasteredInActive.length <= THRESHOLD && waitingQueue.length > 0) {
-        // Dokładamy nową partię
-        const newBatch = waitingQueue.slice(0, BATCH_SIZE)
-        const remainingQueue = waitingQueue.slice(BATCH_SIZE)
-
-        const newActiveCards = [...activeCards, ...newBatch]
-        setActiveCards(newActiveCards)
-        setWaitingQueue(remainingQueue)
-
-        // Nowa runda: nieopanowane + nowe słówka
-        const nextRound = shuffleArray([...notMasteredInActive, ...newBatch])
-        setCurrentRound(nextRound)
+      if (notMasteredInBatch.length > 0) {
+        // Powtórz tylko nieopanowane słówka z tej partii
+        setCurrentRound(shuffleArray(notMasteredInBatch))
         setCurrentIndex(0)
-      } else if (notMasteredInActive.length > 0) {
-        // Powtarzamy tylko nieopanowane
-        setCurrentRound(shuffleArray(notMasteredInActive))
+      } else if (currentBatchIndex < allBatches.length - 1) {
+        // Przejdź do następnej partii
+        const nextBatchIndex = currentBatchIndex + 1
+        setCurrentBatchIndex(nextBatchIndex)
+        setCurrentRound(allBatches[nextBatchIndex])
         setCurrentIndex(0)
+        setMasteredInBatch(new Set())
       } else {
-        // Wszystko opanowane!
+        // Koniec wszystkich partii
         setCompleted(true)
       }
     }
-  }, [currentIndex, currentRound.length, activeCards, masteredIds, waitingQueue])
+  }, [currentIndex, currentRound.length, currentBatch, masteredInBatch, currentBatchIndex, allBatches])
 
   const handleOverrideCorrect = useCallback(async () => {
     if (!currentCard) return
@@ -201,7 +199,8 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
       incorrect: prev.incorrect - 1,
     }))
 
-    setMasteredIds((prev) => new Set(prev).add(currentCard.id))
+    // Oznacz jako opanowane
+    setMasteredInBatch((prev) => new Set(prev).add(currentCard.id))
 
     setCorrectionMode(false)
     setCorrectionDone(true)
@@ -225,16 +224,15 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
   const handleRestart = () => {
     const notMastered = initialFlashcards.filter((f) => !f.stats?.mastered)
     const toUse = notMastered.length > 0 ? notMastered : initialFlashcards
+
     const shuffled = shuffleArray(toUse)
+    const batches = splitIntoBatches(shuffled, BATCH_SIZE)
 
-    const firstBatch = shuffled.slice(0, BATCH_SIZE)
-    const remaining = shuffled.slice(BATCH_SIZE)
-
-    setActiveCards(firstBatch)
-    setWaitingQueue(remaining)
-    setCurrentRound(firstBatch)
+    setAllBatches(batches)
+    setCurrentBatchIndex(0)
+    setCurrentRound(batches[0] || [])
     setCurrentIndex(0)
-    setMasteredIds(new Set())
+    setMasteredInBatch(new Set())
     setCompleted(false)
     setStats({ correct: 0, incorrect: 0 })
     setShowResult(false)
@@ -319,6 +317,8 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
     )
   }
 
+  const notMasteredCount = currentBatch.length - masteredInBatch.size
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4">
@@ -329,43 +329,31 @@ export function PracticeView({ set, flashcards: initialFlashcards }: PracticeVie
           ← Powrót do zestawu
         </Link>
         <div className="text-sm text-gray-500">
-          {currentIndex + 1} / {currentRound.length} w rundzie
+          Partia {currentBatchIndex + 1} / {totalBatches}
         </div>
       </div>
 
-      {/* Postęp ogólny */}
+      {/* Postęp partii */}
       <div className="mb-4 p-3 bg-gray-50 rounded-lg">
         <div className="flex items-center justify-between text-sm mb-2">
           <span className="text-gray-600">
-            Opanowane: {masteredIds.size} / {totalCards}
+            Postęp partii: {batchProgress.mastered} / {batchProgress.total} opanowanych
           </span>
-          {waitingQueue.length > 0 && (
-            <span className="text-gray-500">
-              +{waitingQueue.length} czeka
-            </span>
-          )}
+          <span className="text-gray-500">
+            {currentIndex + 1} / {currentRound.length} w rundzie
+          </span>
         </div>
         <div className="h-2 bg-gray-200 rounded-full">
           <div
             className="h-2 bg-green-500 rounded-full transition-all"
-            style={{ width: `${(masteredIds.size / totalCards) * 100}%` }}
+            style={{ width: `${(batchProgress.mastered / batchProgress.total) * 100}%` }}
           />
         </div>
-        <div className="flex items-center justify-between text-xs mt-1">
-          <span className="text-gray-500">
-            W grze: {activeCards.length} słówek
-          </span>
-          {notMasteredCount > 0 && notMasteredCount <= THRESHOLD && waitingQueue.length > 0 && (
-            <span className="text-blue-600">
-              Zaraz dołożymy {Math.min(BATCH_SIZE, waitingQueue.length)} nowych!
-            </span>
-          )}
-          {notMasteredCount > THRESHOLD && (
-            <span className="text-orange-600">
-              {notMasteredCount} do opanowania
-            </span>
-          )}
-        </div>
+        {notMasteredCount > 0 && notMasteredCount < currentBatch.length && (
+          <p className="text-xs text-orange-600 mt-1">
+            {notMasteredCount} {notMasteredCount === 1 ? 'słówko wraca' : 'słówek wraca'} do powtórki w tej partii
+          </p>
+        )}
       </div>
 
       {/* Progress bar rundy */}
