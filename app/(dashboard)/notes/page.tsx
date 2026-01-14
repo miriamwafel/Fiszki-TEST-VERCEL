@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/Card'
+import { useNotesSync, useNotesEmitter } from '@/lib/useNotesSync'
 
 interface StickyNote {
   id: string
@@ -53,11 +54,9 @@ export default function NotesPage() {
   const [newNoteColor, setNewNoteColor] = useState('yellow')
   const [isCreating, setIsCreating] = useState(false)
 
-  useEffect(() => {
-    fetchNotes()
-  }, [])
+  const { emitCreated, emitUpdated, emitDeleted } = useNotesEmitter()
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       const res = await fetch('/api/notes')
       if (res.ok) {
@@ -69,7 +68,17 @@ export default function NotesPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  // Auto-refresh notes when:
+  // 1. Tab becomes visible again (switching between mobile/desktop)
+  // 2. Window gains focus
+  // 3. Another component emits notes-updated event
+  useNotesSync(fetchNotes)
+
+  useEffect(() => {
+    fetchNotes()
+  }, [fetchNotes])
 
   const createNote = async () => {
     if (!newNoteContent.trim() || isCreating) return
@@ -86,6 +95,7 @@ export default function NotesPage() {
         const note = await res.json()
         setNotes([note, ...notes])
         setNewNoteContent('')
+        emitCreated(note.id)
       }
     } catch (error) {
       console.error('Failed to create note:', error)
@@ -105,6 +115,7 @@ export default function NotesPage() {
       if (res.ok) {
         const updatedNote = await res.json()
         setNotes(notes.map(n => n.id === id ? updatedNote : n))
+        emitUpdated(id)
       }
     } catch (error) {
       console.error('Failed to update note:', error)
@@ -118,6 +129,7 @@ export default function NotesPage() {
       const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' })
       if (res.ok) {
         setNotes(notes.filter(n => n.id !== id))
+        emitDeleted(id)
       }
     } catch (error) {
       console.error('Failed to delete note:', error)

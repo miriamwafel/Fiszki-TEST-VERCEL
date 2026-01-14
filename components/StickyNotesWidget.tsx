@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
+import { useNotesEmitter } from '@/lib/useNotesSync'
 
 const COLORS = [
   { name: 'yellow', bg: 'bg-yellow-100', border: 'border-yellow-300', text: 'text-yellow-800' },
@@ -19,6 +20,7 @@ export function StickyNotesWidget() {
   const [showSuccess, setShowSuccess] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const widgetRef = useRef<HTMLDivElement>(null)
+  const { emitCreated } = useNotesEmitter()
 
   // Focus textarea when opened
   useEffect(() => {
@@ -66,8 +68,11 @@ export function StickyNotesWidget() {
       })
 
       if (res.ok) {
+        const note = await res.json()
         setContent('')
         setShowSuccess(true)
+        // Notify other components (like /notes page) about the new note
+        emitCreated(note.id)
         setTimeout(() => {
           setShowSuccess(false)
           setIsOpen(false)
