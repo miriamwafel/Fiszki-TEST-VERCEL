@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/Button'
@@ -22,12 +22,16 @@ const translationMessages = [
   'Sprawdzamy kontekst użycia...',
 ]
 
-function TranslationLoader({ isLoading }: { isLoading: boolean }) {
+function TranslationLoader({ isLoading, onCancel }: { isLoading: boolean; onCancel?: () => void }) {
   const [message, setMessage] = useState(translationMessages[0])
   const [dots, setDots] = useState('')
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   useEffect(() => {
-    if (!isLoading) return
+    if (!isLoading) {
+      setElapsedTime(0)
+      return
+    }
 
     const msgInterval = setInterval(() => {
       setMessage(translationMessages[Math.floor(Math.random() * translationMessages.length)])
@@ -37,18 +41,41 @@ function TranslationLoader({ isLoading }: { isLoading: boolean }) {
       setDots(prev => prev.length >= 3 ? '' : prev + '.')
     }, 500)
 
+    const timeInterval = setInterval(() => {
+      setElapsedTime(prev => prev + 1)
+    }, 1000)
+
     return () => {
       clearInterval(msgInterval)
       clearInterval(dotsInterval)
+      clearInterval(timeInterval)
     }
   }, [isLoading])
 
   if (!isLoading) return null
 
   return (
-    <div className="mt-4 p-4 bg-primary-50 rounded-lg flex items-center gap-3">
-      <div className="w-5 h-5 border-2 border-primary-200 rounded-full animate-spin border-t-primary-600" />
-      <span className="text-primary-700">{message}{dots}</span>
+    <div className="mt-4 p-4 bg-primary-50 rounded-lg">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-primary-200 rounded-full animate-spin border-t-primary-600" />
+          <span className="text-primary-700">{message}{dots}</span>
+        </div>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+          >
+            Przerwij
+          </button>
+        )}
+      </div>
+      {elapsedTime >= 3 && (
+        <p className="text-xs text-gray-500 mt-2">
+          Trwa już {elapsedTime}s... {elapsedTime >= 10 ? 'AI może być przeciążone.' : ''}
+        </p>
+      )}
     </div>
   )
 }
@@ -96,6 +123,7 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
   const [word, setWord] = useState('')
   const [loading, setLoading] = useState(false)
   const [translationResult, setTranslationResult] = useState<TranslationResult | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [flashcardToDelete, setFlashcardToDelete] = useState<string | null>(null)
@@ -125,6 +153,14 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
 
   usePageContent(pageContentData)
 
+  const cancelTranslation = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setLoading(false)
+    }
+  }
+
   const handleTranslate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!word.trim()) return
@@ -145,6 +181,14 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
     }
 
     // 2. Nie ma w cache - pytaj AI
+    // Anuluj poprzednie żądanie jeśli istnieje
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Utwórz nowy AbortController
+    abortControllerRef.current = new AbortController()
+
     setLoading(true)
     setTranslationResult(null)
 
@@ -153,6 +197,7 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ word: trimmedWord, language: set.language }),
+        signal: abortControllerRef.current.signal,
       })
 
       const data = await response.json()
@@ -174,10 +219,16 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
 
       setTranslationResult(data)
     } catch (error) {
+      // Nie pokazuj błędu jeśli użytkownik przerwał żądanie
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Translation cancelled by user')
+        return
+      }
       console.error('Translation error:', error)
       alert('Wystąpił błąd podczas tłumaczenia')
     } finally {
       setLoading(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -441,7 +492,7 @@ export function SetView({ initialSet }: { initialSet: FlashcardSet }) {
           </Button>
         </form>
 
-        <TranslationLoader isLoading={loading} />
+        <TranslationLoader isLoading={loading} onCancel={cancelTranslation} />
 
         {translationResult && (
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
